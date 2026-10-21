@@ -1,0 +1,135 @@
+/* Castello di Silvano Pietra APS — foglio di stile
+   Colori presi dai materiali del castello: intonaco a calce, carbone del logo,
+   terra verde degli affreschi, ocra dorata, notte per gli eventi serali. */
+:root{
+  --intonaco:#E8E6E3;
+  --intonaco-chiaro:#F3F2F0;
+  --carbone:#2F3336;
+  --carbone-tenue:#5B6064;
+  --terraverde:#4F6B5E;
+  --terraverde-scuro:#3D5449;
+  --ocra:#A8823A;
+  --notte:#1A1F24;
+  --linea:#CBC7C1;
+  --serif-titoli:"Marcellus", "Trajan Pro", Georgia, serif;
+  --serif-testo:"Literata", Georgia, "Times New Roman", serif;
+  --misura:68ch;
+  --ritmo:1.6rem;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--intonaco);color:var(--carbone);font:400 1.0625rem/1.7 var(--serif-testo);text-rendering:optimizeLegibility}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--terraverde-scuro);text-underline-offset:.18em;text-decoration-thickness:1px}
+a:hover{color:var(--carbone)}
+:focus-visible{outline:2px solid var(--ocra);outline-offset:3px}
+h1,h2,h3{font-family:var(--serif-titoli);font-weight:400;line-height:1.15;margin:0 0 .6em;letter-spacing:.01em}
+h1{font-size:clamp(2.4rem,6vw,4.4rem)}
+h2{font-size:clamp(1.8rem,3.6vw,2.6rem)}
+h3{font-size:1.35rem}
+p{margin:0 0 1em;max-width:var(--misura)}
+.salta{position:absolute;left:-9999px}
+.salta:focus{left:1rem;top:1rem;background:#fff;padding:.5rem 1rem;z-index:10}
+
+/* Testata */
+.testata{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,4vw,3rem);border-bottom:1px solid var(--linea);background:var(--intonaco);position:sticky;top:0;z-index:5}
+.marchio{display:flex;align-items:center;gap:.75rem;text-decoration:none;color:var(--carbone)}
+.marchio-testo{font-family:var(--serif-titoli);font-size:1.35rem;line-height:1}
+.marchio-testo small{display:block;font-family:var(--serif-testo);font-size:.72rem;letter-spacing:.08em;color:var(--carbone-tenue);margin-bottom:.2rem}
+.menu ul{list-style:none;margin:0;padding:0;display:flex;gap:clamp(.8rem,2vw,1.8rem)}
+.menu a{text-decoration:none;color:var(--carbone);padding:.3rem 0;border-bottom:1px solid transparent}
+.menu a:hover,.menu a[aria-current="page"]{border-bottom-color:var(--ocra)}
+.menu-apri{display:none;font:inherit;background:none;border:1px solid var(--carbone);color:var(--carbone);padding:.35rem .9rem;border-radius:2px}
+@media (max-width:820px){
+  .menu-apri{display:block}
+  .menu{position:absolute;left:0;right:0;top:100%;background:var(--intonaco);border-bottom:1px solid var(--linea);display:none}
+  .menu.aperto{display:block}
+  .menu ul{flex-direction:column;gap:0;padding:.5rem 1rem 1rem}
+  .menu a{display:block;padding:.7rem 0;border-bottom:1px solid var(--linea)}
+}
+
+/* Contenitori */
+.fascia{padding:clamp(3rem,8vw,6.5rem) clamp(1rem,5vw,4rem)}
+.fascia-stretta{max-width:76rem;margin:0 auto}
+.fascia-chiara{background:var(--intonaco-chiaro)}
+.fascia-verde{background:var(--terraverde);color:#F1F3EF}
+.fascia-verde a{color:#fff}
+.fascia-notte{background:var(--notte);color:#D9DCDF}
+.fascia-notte a{color:#E9D6A8}
+.introduzione{font-size:1.25rem;line-height:1.6;max-width:56ch}
+
+/* Hero: il castello come sagoma, la favola come titolo */
+.hero{position:relative;padding:clamp(3rem,9vw,7rem) clamp(1rem,5vw,4rem) 0;overflow:hidden}
+.hero-testo{max-width:76rem;margin:0 auto;position:relative;z-index:1}
+.hero h1{max-width:14ch}
+.hero .introduzione{color:var(--carbone-tenue)}
+.hero-sagoma{display:block;width:min(760px,92%);margin:clamp(1.5rem,4vw,2rem) 0 0 auto}
+@media (min-width:1000px){.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:3rem;align-items:end;max-width:84rem;margin:0 auto;padding-top:3rem}.hero-testo{margin:0 0 4rem}.hero-sagoma{width:100%;margin:0}}
+.hero-azioni{display:flex;flex-wrap:wrap;gap:.8rem;margin-top:1.6rem}
+
+.bottone{display:inline-block;font:600 1rem/1 var(--serif-testo);text-decoration:none;padding:.95rem 1.4rem;border:1px solid var(--carbone);color:var(--carbone);background:transparent;border-radius:2px;cursor:pointer}
+.bottone:hover{background:var(--carbone);color:var(--intonaco)}
+.bottone-pieno{background:var(--terraverde);border-color:var(--terraverde);color:#fff}
+.bottone-pieno:hover{background:var(--terraverde-scuro);border-color:var(--terraverde-scuro);color:#fff}
+.fascia-notte .bottone{border-color:#E9D6A8;color:#E9D6A8}
+.fascia-notte .bottone:hover{background:#E9D6A8;color:var(--notte)}
+
+/* Due colonne */
+.colonne{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,6vw,5rem);align-items:start}
+@media (max-width:820px){.colonne{grid-template-columns:1fr}}
+
+/* Cronologia: è una vera sequenza, quindi le date guidano */
+.cronologia{list-style:none;margin:2rem 0 0;padding:0;border-left:2px solid var(--carbone);max-width:52rem}
+.cronologia li{position:relative;padding:0 0 2.2rem 2rem}
+.cronologia li::before{content:"";position:absolute;left:-7px;top:.55rem;width:12px;height:12px;background:var(--intonaco);border:2px solid var(--carbone)}
+.cronologia .anno{display:block;font-family:var(--serif-titoli);font-size:2rem;line-height:1;margin-bottom:.4rem;color:var(--terraverde-scuro)}
+.cronologia p{margin:0}
+
+/* Le tre torri: altezze reali in scala */
+.torri{display:flex;align-items:flex-end;gap:clamp(1rem,4vw,3rem);height:260px;margin:2rem 0 1rem;max-width:30rem}
+.torre{flex:1;background:var(--carbone);position:relative;min-width:44px}
+.torre span{position:absolute;bottom:100%;left:0;right:0;text-align:center;font-family:var(--serif-titoli);font-size:1.2rem;padding-bottom:.3rem}
+.torri-nota{font-size:.95rem;color:var(--carbone-tenue)}
+
+/* Eventi */
+.eventi{display:grid;gap:1.5rem;margin-top:2rem}
+.evento{display:grid;grid-template-columns:7.5rem 1fr;gap:1.5rem;padding:1.5rem 0;border-top:1px solid currentColor;border-color:rgba(0,0,0,.18)}
+.fascia-notte .evento{border-color:rgba(255,255,255,.2)}
+.evento-data{font-family:var(--serif-titoli);line-height:1}
+.evento-data .giorno{font-size:3rem;display:block}
+.evento-data .mese{font-size:1rem}
+.evento h3{margin-bottom:.4rem}
+.evento .dettagli{font-size:.95rem;opacity:.85;margin-bottom:.8rem}
+.evento .avviso{font-style:italic}
+.eventi-vuoto{font-style:italic}
+@media (max-width:560px){.evento{grid-template-columns:1fr;gap:.6rem}}
+
+/* Restauri */
+.cantieri{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:2.5rem;margin-top:2rem}
+.cantiere h3{border-bottom:1px solid var(--linea);padding-bottom:.6rem}
+.stato{display:inline-block;font-size:.85rem;padding:.15rem .6rem;border:1px solid var(--terraverde);color:var(--terraverde-scuro);border-radius:2px;margin-bottom:.6rem}
+
+/* Modi per sostenere */
+.sostegno{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:2rem;margin-top:2rem}
+.sostegno h3{color:#fff}
+
+/* Segnaposto foto */
+.foto-segnaposto{aspect-ratio:4/3;background:repeating-linear-gradient(135deg,#dcd9d4 0 12px,#e3e0dc 12px 24px);display:flex;align-items:center;justify-content:center;color:var(--carbone-tenue);font-size:.9rem;text-align:center;padding:1rem;border:1px solid var(--linea)}
+figure{margin:0}
+figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
+
+/* Direttivo e dati */
+.elenco-semplice{list-style:none;padding:0;margin:1rem 0}
+.elenco-semplice li{padding:.6rem 0;border-bottom:1px solid var(--linea);display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.elenco-semplice li span:first-child{color:var(--carbone-tenue)}
+
+/* Citazione */
+.citazione{font-family:var(--serif-titoli);font-size:clamp(1.5rem,3vw,2.2rem);line-height:1.35;max-width:32ch;margin:0}
+
+/* Piede */
+.piede{background:var(--carbone);color:#D5D8DA;padding:3rem clamp(1rem,5vw,4rem) 1.5rem;font-size:.95rem}
+.piede a{color:#fff}
+.piede-griglia{max-width:76rem;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:2rem}
+.piede-logo{filter:invert(1) brightness(1.6);margin-bottom:1rem}
+.piede-fine{max-width:76rem;margin:2.5rem auto 0;padding-top:1rem;border-top:1px solid rgba(255,255,255,.15);font-size:.85rem;color:#9EA3A7}

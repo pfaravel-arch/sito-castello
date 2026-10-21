@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}} | Castello di Silvano Pietra</title>
+<meta name="description" content="{{description}}">
+<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/sito.css?v={{version}}">
+<meta property="og:title" content="{{title}} | Castello di Silvano Pietra">
+<meta property="og:description" content="{{description}}">
+<meta property="og:type" content="website">
+</head>
+<body class="pagina-{{slug}}">
+<a class="salta" href="#contenuto">Vai al contenuto</a>
+<header class="testata">
+  <a class="marchio" href="/" aria-label="Castello di Silvano Pietra, home">
+    <img src="/assets/img/logo.svg" alt="" width="56" height="34">
+    <span class="marchio-testo"><small>Castello di</small> Silvano Pietra</span>
+  </a>
+  <button class="menu-apri" aria-expanded="false" aria-controls="menu">Menu</button>
+  <nav id="menu" class="menu" aria-label="Principale">
+    <ul>
+{{nav}}
+    </ul>
+  </nav>
+</header>
+
+<main id="contenuto">
+{{content}}
+</main>
+
+<footer class="piede">
+  <div class="piede-griglia">
+    <div>
+      <img src="/assets/img/logo.svg" alt="" width="84" height="52" class="piede-logo">
+      <p><strong>Castello di Silvano Pietra APS</strong><br>
+      Piazza Vittorio Veneto 4<br>27050 Silvano Pietra (PV)</p>
+    </div>
+    <div>
+      <p>Scrivici<br><a href="mailto:info@castellodisilvanopietra.com">info@castellodisilvanopietra.com</a></p>
+      <p>Seguici<br>
+      <a href="https://www.facebook.com/castellodisilvanopietra" rel="noopener">Facebook</a> e
+      <a href="https://www.instagram.com/castellodisilvanopietra" rel="noopener">Instagram</a></p>
+    </div>
+    <div>
+      <p>Associazione di promozione sociale per la tutela e il restauro del castello.</p>
+      <p><a href="/associazione.html#trasparenza">Trasparenza</a><br><a href="/privacy.html">Privacy</a></p>
+    </div>
+  </div>
+  <p class="piede-fine">© {{year}} Castello di Silvano Pietra APS</p>
+</footer>
+<script src="/assets/js/sito.js?v={{version}}" defer></script>
+{{scripts}}
+</body>
+</html>

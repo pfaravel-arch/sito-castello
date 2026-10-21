@@ -1,0 +1,40 @@
+# Pubblica il sito su Aruba ogni volta che si aggiorna il ramo main.
+# Credenziali in Settings > Secrets and variables > Actions:
+#   FTP_SERVER    es. ftp.castellodisilvanopietra.com
+#   FTP_USERNAME  utente FTP Aruba
+#   FTP_PASSWORD  password FTP Aruba
+#   FTP_DIR       cartella del sito sul server, es. /www.castellodisilvanopietra.com/
+name: Pubblica su Aruba
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pubblica
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Costruisci il sito
+        run: python3 build.py
+
+      - name: Carica via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_DIR }}
+          local-dir: ./dist/
+          protocol: ftps
+          dangerous-clean-slate: false
