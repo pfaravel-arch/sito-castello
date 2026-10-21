@@ -6,9 +6,11 @@
 #   FTP_DIR       cartella del sito sul server, es. /www.castellodisilvanopietra.com/
 name: Pubblica su Aruba
 
+# Per ora solo avvio manuale (scheda Actions > Pubblica su Aruba > Run workflow).
+# Per pubblicare a ogni modifica, togli il # dalle due righe sotto.
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 concurrency:
