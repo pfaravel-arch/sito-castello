@@ -1,42 +1,42 @@
-# Pubblica il sito su Aruba ogni volta che si aggiorna il ramo main.
-# Credenziali in Settings > Secrets and variables > Actions:
-#   FTP_SERVER    es. ftp.castellodisilvanopietra.com
-#   FTP_USERNAME  utente FTP Aruba
-#   FTP_PASSWORD  password FTP Aruba
-#   FTP_DIR       cartella del sito sul server, es. /www.castellodisilvanopietra.com/
-name: Pubblica su Aruba
+# Pubblica il sito su GitHub Pages a ogni modifica del ramo main.
+# Il dominio castellodisilvanopietra.com punta qui tramite i DNS di Aruba.
+name: Pubblica il sito
 
-# Per ora solo avvio manuale (scheda Actions > Pubblica su Aruba > Run workflow).
-# Per pubblicare a ogni modifica, togli il # dalle due righe sotto.
 on:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
-  group: pubblica
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  pubblica:
+  costruisci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Costruisci il sito
         run: python3 build.py
-
-      - name: Carica via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_DIR }}
-          local-dir: ./dist/
-          protocol: ftps
-          dangerous-clean-slate: false
+          path: ./dist
+
+  pubblica:
+    needs: costruisci
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

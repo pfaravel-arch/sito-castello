@@ -1,8 +1,9 @@
 # Sito del Castello di Silvano Pietra APS
 
-Sito statico su misura per castellodisilvanopietra.com, ospitato su Aruba.
-Ogni modifica caricata sul ramo `main` di GitHub viene costruita e pubblicata
-automaticamente via FTP (vedi `.github/workflows/pubblica.yml`).
+Sito statico su misura per castellodisilvanopietra.com, ospitato gratis su GitHub Pages.
+Il dominio resta registrato su Aruba (anche la posta), e i suoi DNS puntano a GitHub.
+Ogni modifica caricata sul ramo `main` viene costruita e pubblicata da sola
+(vedi `.github/workflows/pubblica.yml`).
 
 ## Struttura
 
@@ -70,8 +71,12 @@ e apri http://localhost:8000
 
 ## Pubblicazione
 
-Nel repository GitHub, in Settings > Secrets and variables > Actions, crea:
-`FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`, `FTP_DIR`.
-I dati sono nel pannello Aruba (Hosting > Gestione FTP). La cartella del sito su Aruba
-di solito è `/www.castellodisilvanopietra.com/`.
-Se FTPS non funziona, nel workflow cambia `protocol: ftps` in `protocol: ftp`.
+Automatica a ogni modifica di `main`. Lo stato si vede nella scheda Actions del repository.
+
+Impostazioni una tantum:
+- GitHub: Settings > Pages > Source: GitHub Actions; Custom domain: www.castellodisilvanopietra.com; Enforce HTTPS.
+- Aruba, Gestione DNS: record A su `@` verso 185.199.108.153, 185.199.109.153, 185.199.110.153, 185.199.111.153;
+  record CNAME `www` verso `pfaravel-arch.github.io`. I record MX della posta non vanno toccati.
+
+Nota: `.htaccess` serve solo su server Apache; su GitHub Pages viene ignorato
+(la pagina 404.html funziona comunque).
