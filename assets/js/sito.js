@@ -38,6 +38,6 @@
       el.innerHTML=sel.length?sel.map(scheda).join(''):'<p class="eventi-vuoto">'+esc(el.getAttribute('data-vuoto')||'Nuovi appuntamenti in arrivo: seguici sui social per saperlo per primo.')+'</p>';
     });
   }).catch(function(){
-    box.forEach(function(el){el.innerHTML='<p class="eventi-vuoto">Il calendario non si è caricato. Ricarica la pagina o scrivici a info@castellodisilvanopietra.com.</p>';});
+    box.forEach(function(el){el.innerHTML='<p class="eventi-vuoto">Il calendario non si è caricato. Ricarica la pagina o scrivici a castellodisilvanopietra@gmail.com.</p>';});
   });
 })();
