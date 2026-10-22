@@ -136,3 +136,6 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .piede-griglia{max-width:76rem;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:2rem}
 .piede-logo{width:190px;margin-bottom:1.2rem}
 .piede-fine{max-width:76rem;margin:2.5rem auto 0;padding-top:1rem;border-top:1px solid rgba(255,255,255,.15);font-size:.85rem;color:#9EA3A7}
+
+.locandina-grande{display:block;max-width:24rem;margin-bottom:2rem}
+.locandina-grande img{width:100%;height:auto;box-shadow:0 10px 30px rgba(0,0,0,.45)}

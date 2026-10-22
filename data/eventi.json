@@ -1,12 +1,13 @@
 [
   {
-    "titolo": "Halloween al Castello: il percorso horror",
+    "titolo": "Delirium al Castello: horror tour di Halloween",
     "data": "2026-10-31",
-    "orario": "Partenze ogni 30 minuti dalle 17:00 alle 24:00",
-    "luogo": "Castello di Silvano Pietra",
-    "descrizione": "Un percorso immersivo su tre piani del Castello, guidato in gruppi di massimo 15 persone e riservato ai soci dell'associazione. Durante la serata è attivo lo stand gastronomico della Pro Loco con polenta e salamini.",
-    "avviso": "Solo su prenotazione. Esperienza intensa, pensata per chi ama le emozioni forti. Arriva 15-30 minuti prima dell'orario prenotato.",
+    "orario": "Dalle 17:00 alle 24:00, partenze ogni 30 minuti",
+    "luogo": "Castello di Silvano Pietra, Piazza Vittorio Veneto 4",
+    "descrizione": "Un'esperienza teatrale immersiva su tre piani del Castello, tra misteri, leggende e presenze del passato. Gruppi di massimo 15 persone, riservato ai soci dell'associazione. Durante la serata è attivo lo stand gastronomico della Pro Loco con polenta e salamini.",
+    "avviso": "Prenotazione obbligatoria. Consigliato ai coraggiosi: è un'esperienza intensa, anche sul piano psicologico. Arriva 15-30 minuti prima dell'orario prenotato.",
     "link": "/eventi.html#halloween",
-    "etichetta_link": "Come prenotare"
+    "etichetta_link": "Come prenotare",
+    "locandina": "/assets/img/eventi/delirium-halloween-2026.jpg"
   }
 ]
