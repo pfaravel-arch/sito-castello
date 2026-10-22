@@ -18,11 +18,12 @@
   function scheda(e){
     var d=new Date(e.data+'T12:00:00');
     var link=e.link?'<a class="bottone" href="'+esc(e.link)+'">'+esc(e.etichetta_link||'Scopri di più')+'</a>':'';
-    return '<article class="evento"><div class="evento-data"><span class="giorno">'+d.getDate()+'</span><span class="mese">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</span></div>'+
+    var loc=e.locandina?'<a class="evento-locandina" href="'+esc(e.locandina)+'" target="_blank" rel="noopener"><img src="'+esc(e.locandina)+'" alt="Locandina: '+esc(e.titolo)+'" loading="lazy"></a>':'';
+    return '<article class="evento'+(loc?' con-locandina':'')+'"><div class="evento-data"><span class="giorno">'+d.getDate()+'</span><span class="mese">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</span></div>'+
       '<div><h3>'+esc(e.titolo)+'</h3>'+
       (e.orario||e.luogo?'<p class="dettagli">'+esc([e.orario,e.luogo].filter(Boolean).join(', '))+'</p>':'')+
       '<p>'+esc(e.descrizione)+'</p>'+
-      (e.avviso?'<p class="avviso">'+esc(e.avviso)+'</p>':'')+link+'</div></article>';
+      (e.avviso?'<p class="avviso">'+esc(e.avviso)+'</p>':'')+link+'</div>'+loc+'</article>';
   }
   fetch('/data/eventi.json',{cache:'no-cache'}).then(function(r){return r.json();}).then(function(lista){
     var oggi=new Date(); oggi.setHours(0,0,0,0);
