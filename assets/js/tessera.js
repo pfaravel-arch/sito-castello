@@ -8,7 +8,6 @@
   var $ = function (id) { return document.getElementById(id); };
   if (!$("tessera-esito")) return;
   var enc = new TextEncoder();
-  function data(d) { return d ? d.split("-").reverse().join("/") : "—"; }
   function hex(buf) { return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ("0" + x.toString(16)).slice(-2); }).join(""); }
   function bytes(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
   function decifra(codice, voce) {
@@ -22,10 +21,7 @@
     $("tessera-numero-piccolo").textContent = o.numero ? "Tessera N. " + o.numero : "Tessera socio";
     var e = $("tessera-esito"); e.className = "esito esito-" + o.classe; e.innerHTML = "";
     var st = document.createElement("p"); st.className = "esito-stato"; st.textContent = o.stato; e.appendChild(st);
-    if (o.scadenza !== undefined) {
-      var dl = document.createElement("p"); dl.className = "esito-riga";
-      dl.innerHTML = "Fine validità: <strong></strong>"; dl.querySelector("strong").textContent = data(o.scadenza); e.appendChild(dl);
-    }
+    if (o.riga) { var dl = document.createElement("p"); dl.className = "esito-riga"; dl.textContent = o.riga; e.appendChild(dl); }
     if (o.nota) { var n = document.createElement("p"); n.className = "esito-nota"; n.textContent = o.nota; e.appendChild(n); }
   }
   function verifica() {
@@ -47,9 +43,13 @@
         var nome = ((s.nome || "") + " " + (s.cognome || "")).trim();
         if (s.st === "libera") return mostra({ titolo: "Tessera da attivare", numero: s.n, classe: "attesa", stato: "Non ancora assegnata", nota: "La tessera sarà attiva appena registrata l'iscrizione." });
         if (s.st === "bloccata") return mostra({ titolo: nome || "Tessera bloccata", numero: s.n, classe: "no", stato: "Bloccata", nota: "La tessera è stata sostituita o bloccata. Rivolgiti all'associazione." });
-        var scaduta = s.st !== "valida" || !s.scad || new Date() > new Date(s.scad + "T23:59:59");
-        mostra({ titolo: nome, numero: s.n, classe: scaduta ? "no" : "si", stato: scaduta ? "Scaduta" : "Valida", scadenza: s.scad,
-                 nota: scaduta ? "Rinnova la quota associativa per l'anno in corso." : "" });
+        /* La quota di un anno vale dal 1° gennaio al 31 dicembre di quell'anno */
+        var anni = s.anni || [], oggi = new Date().getFullYear();
+        if (anni.indexOf(oggi) >= 0) return mostra({ titolo: nome, numero: s.n, classe: "si", stato: "Valida", riga: "Validità: 01/01/" + oggi + " – 31/12/" + oggi });
+        var passati = anni.filter(function (a) { return a < oggi; }), futuri = anni.filter(function (a) { return a > oggi; });
+        mostra({ titolo: nome, numero: s.n, classe: "no", stato: "Scaduta",
+                 riga: passati.length ? "Scaduta il 31/12/" + passati[passati.length - 1] : "Nessuna quota versata",
+                 nota: futuri.length ? "Rinnovata per il " + futuri[0] + ": valida dal 01/01/" + futuri[0] + "." : "Rinnova la quota associativa per l'anno " + oggi + "." });
       });
     }).catch(function () {
       mostra({ titolo: "Verifica non riuscita", classe: "no", stato: "Riprova", nota: "Controlla la connessione e tocca di nuovo la tessera." });
