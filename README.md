@@ -87,7 +87,7 @@ Ogni tessera contiene l'indirizzo `https://castellodisilvanopietra.com/t/CODICE`
 GitHub Pages non ha quell'indirizzo, quindi risponde con `404.html`, che rimanda a
 `/tessera.html#CODICE` (pagina di verifica, fuori dal menu).
 
-`data/tessere.json` si genera dal gestionale soci (Impostazioni > «Scarica il file per il sito»)
-e si carica qui al posto del precedente. Per ogni tessera contiene l'impronta SHA-256 del codice
+`data/tessere.json` viene rigenerato in automatico da un'attività pianificata di Claude, che
+esporta il gestionale soci e lancia `strumenti/genera_tessere.py`. Per ogni tessera contiene l'impronta SHA-256 del codice
 e la scheda (numero, nome, stato, fine validità) cifrata in AES-GCM con una chiave ricavata dal
 codice: solo chi ha la tessera può leggere la propria scheda. Il file non contiene mai i codici.
