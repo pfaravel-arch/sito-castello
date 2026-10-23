@@ -143,12 +143,16 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 /* Verifica tessera socio */
 .verifica{max-width:34rem;text-align:center}
 .verifica .sopratitolo{margin-bottom:.6rem}
+.verifica h1{font-size:clamp(2rem,7vw,3.2rem);text-wrap:balance}
 .esito{border:1px solid var(--linea);background:var(--intonaco-chiaro);padding:1.4rem 1.6rem;margin:1.5rem 0;text-align:left}
 .esito p{margin:0}
-.esito-titolo{font-family:var(--serif-titoli);font-size:1.6rem;margin-bottom:.3rem!important}
-.esito-si{border-color:var(--terraverde);border-left:6px solid var(--terraverde)}
-.esito-si .esito-titolo{color:var(--terraverde-scuro)}
+.esito-stato{font-family:var(--serif-titoli);font-size:1.9rem;letter-spacing:.06em;text-transform:uppercase;line-height:1.1;margin-bottom:.5rem!important}
+.esito-riga{font-size:1.1rem}
+.esito-nota{margin-top:.6rem!important;color:var(--carbone-tenue);font-size:.98rem}
+.esito-si{border-left:6px solid var(--terraverde)}
+.esito-si .esito-stato{color:var(--terraverde-scuro)}
 .esito-no{border-left:6px solid #9B3A2E}
-.esito-no .esito-titolo{color:#8A3328}
-.verifica-nota{font-size:.95rem;color:var(--carbone-tenue);margin-inline:auto}
+.esito-no .esito-stato{color:#8A3328}
+.esito-attesa{border-left:6px solid var(--ocra)}
+.esito-attesa .esito-stato{color:#7A5E28}
 .verifica-staff{font-size:.9rem;margin-inline:auto}
