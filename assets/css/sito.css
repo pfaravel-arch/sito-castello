@@ -139,3 +139,16 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 
 .locandina-grande{display:block;max-width:24rem;margin-bottom:2rem}
 .locandina-grande img{width:100%;height:auto;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+
+/* Verifica tessera socio */
+.verifica{max-width:34rem;text-align:center}
+.verifica .sopratitolo{margin-bottom:.6rem}
+.esito{border:1px solid var(--linea);background:var(--intonaco-chiaro);padding:1.4rem 1.6rem;margin:1.5rem 0;text-align:left}
+.esito p{margin:0}
+.esito-titolo{font-family:var(--serif-titoli);font-size:1.6rem;margin-bottom:.3rem!important}
+.esito-si{border-color:var(--terraverde);border-left:6px solid var(--terraverde)}
+.esito-si .esito-titolo{color:var(--terraverde-scuro)}
+.esito-no{border-left:6px solid #9B3A2E}
+.esito-no .esito-titolo{color:#8A3328}
+.verifica-nota{font-size:.95rem;color:var(--carbone-tenue);margin-inline:auto}
+.verifica-staff{font-size:.9rem;margin-inline:auto}

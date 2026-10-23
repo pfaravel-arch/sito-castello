@@ -80,3 +80,12 @@ Impostazioni una tantum:
 
 Nota: `.htaccess` serve solo su server Apache; su GitHub Pages viene ignorato
 (la pagina 404.html funziona comunque).
+
+## Tessere soci NFC
+
+Ogni tessera contiene l'indirizzo `https://castellodisilvanopietra.com/t/CODICE`.
+GitHub Pages non ha quell'indirizzo, quindi risponde con `404.html`, che rimanda a
+`/tessera.html#CODICE` (pagina di verifica, fuori dal menu).
+`data/tessere.json` contiene solo l'impronta SHA-256 dei codici (mai i codici), la
+scadenza (`scadenza`) e i numeri bloccati (`bloccate`). Per bloccare una tessera persa
+aggiungi il suo numero in `bloccate`; a fine anno aggiorna `anno` e `scadenza`.
