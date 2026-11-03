@@ -121,7 +121,9 @@ tramite la sua impronta `AREA_TOKEN_SHA256` in `prenotazioni/wrangler.toml`: le 
 eventi e Gestione prenotazioni non chiedono altre password e, se aperte senza accesso, rimandano
 all'area riservata. "Esci" nell'area riservata chiude l'accesso.
 
-Le e-mail di conferma delle prenotazioni partono con Brevo quando c'è il secret `BREVO_API_KEY`
-(GitHub → Actions). Mittente, risposta e copia all'associazione si impostano in `wrangler.toml`
-(`EMAIL_MITTENTE`, `EMAIL_RISPOSTA`, `EMAIL_COPIA`). Il dominio del mittente va autenticato su Brevo
-(record DNS su Aruba).
+Le e-mail di conferma delle prenotazioni (al partecipante e copia all'associazione) partono dalla
+Gmail del Castello via SMTP (`smtp.gmail.com:465`, `prenotazioni/src/smtp.js`) quando c'è il secret
+`SMTP_PASSWORD` (password per le app di Google, con verifica in due passaggi attiva). Mittente, risposta
+e copia si impostano in `wrangler.toml`. In alternativa, senza `SMTP_PASSWORD`, si può usare Brevo con il
+secret `BREVO_API_KEY`. Se la password per le app viene revocata, le prenotazioni continuano a
+funzionare ma le e-mail non partono.

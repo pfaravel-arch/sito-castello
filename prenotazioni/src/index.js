@@ -19,6 +19,8 @@
 //
 // Al primo uso, se la tabella eventi e' vuota, importa data/eventi.json del sito (con le locandine).
 
+import { componiMessaggio, inviaSmtp } from "./smtp.js";
+
 const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // senza 0/O e 1/I
 const STATI = ["bozza", "pubblicato", "chiuso"];
 const TIPI_IMMAGINE = ["image/jpeg", "image/png", "image/webp"];
@@ -377,8 +379,8 @@ async function prenota(env, d, ctx, admin) {
           : "Questa fascia oraria è appena stata completata: scegline un'altra.", 409);
       }
       const p = { codice, nome, cognome, email, telefono, persone, fascia, socio, tessera, note };
-      const conferma = !!(email && env.BREVO_API_KEY);
-      if (env.BREVO_API_KEY) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
+      const conferma = !!(email && emailAttiva(env));
+      if (emailAttiva(env)) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
       return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, email_conferma: conferma }, 201);
     } catch (e) {
       if (e instanceof Errore) throw e;
@@ -434,6 +436,21 @@ ${ev.avviso ? `<p style="font-style:italic;font-size:15px;line-height:1.6;margin
   return { oggetto, testo, html };
 }
 
+// Invio: posta via SMTP (Gmail del Castello) se c'e' SMTP_PASSWORD, altrimenti Brevo se c'e' BREVO_API_KEY
+const emailAttiva = (env) => !!(env.SMTP_PASSWORD || env.BREVO_API_KEY);
+
+async function invia(env, a, nomeA, oggetto, testo, html) {
+  if (env.SMTP_PASSWORD) {
+    const da = env.EMAIL_MITTENTE;
+    const messaggio = componiMessaggio({ da, nomeDa: env.EMAIL_NOME || "Castello di Silvano Pietra APS", a, nomeA,
+      rispondiA: env.EMAIL_RISPOSTA && env.EMAIL_RISPOSTA !== da ? env.EMAIL_RISPOSTA : null, oggetto, testo, html });
+    const connetti = env.__connetti || (await import("cloudflare:sockets")).connect;
+    return inviaSmtp({ host: env.SMTP_HOST, porta: Number(env.SMTP_PORTA) || 465, utente: env.SMTP_UTENTE || da,
+      password: env.SMTP_PASSWORD, da, a }, messaggio, connetti);
+  }
+  return inviaBrevo(env, a, nomeA, oggetto, testo, html);
+}
+
 async function inviaBrevo(env, a, nomeA, oggetto, testo, html) {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -451,10 +468,10 @@ async function inviaBrevo(env, a, nomeA, oggetto, testo, html) {
 async function inviaEmailPrenotazione(env, ev, p) {
   const m = testoEmail(ev, p);
   const invii = [];
-  if (p.email) invii.push(inviaBrevo(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
+  if (p.email) invii.push(invia(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
   if (env.EMAIL_COPIA) {
     const contatti = [p.email, p.telefono].filter(Boolean).join(" · ");
-    invii.push(inviaBrevo(env, env.EMAIL_COPIA, "", `Nuova prenotazione: ${ev.titolo}, ${p.fascia !== "unica" ? "ore " + p.fascia + ", " : ""}${p.persone} pers. (${p.codice})`,
+    invii.push(invia(env, env.EMAIL_COPIA, "", `Nuova prenotazione: ${ev.titolo}, ${p.fascia !== "unica" ? "ore " + p.fascia + ", " : ""}${p.persone} pers. (${p.codice})`,
       `${p.cognome} ${p.nome}, ${p.persone} persone\n${contatti}\n` +
       `Tessera: ${p.socio === "richiesta" ? "chiede di aderire" : p.tessera || "socio, numero non indicato"}\n` + (p.note ? `Note: ${p.note}\n` : "") +
       `\nCodice ${p.codice}. Elenco completo: https://www.castellodisilvanopietra.com/gestione-prenotazioni.html`));

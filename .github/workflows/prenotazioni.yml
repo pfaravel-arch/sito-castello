@@ -3,7 +3,8 @@
 #   CLOUDFLARE_API_TOKEN    chiave Cloudflare con permessi Workers Scripts: Edit e D1: Edit
 #   CLOUDFLARE_ACCOUNT_ID   identificativo dell'account Cloudflare
 #   PRENOTAZIONI_PASSWORD   password di riserva per le pagine di gestione (di solito si entra dall'area riservata)
-#   BREVO_API_KEY           (facoltativo) chiave Brevo per le e-mail di conferma delle prenotazioni
+#   SMTP_PASSWORD           password per le app della Gmail del Castello (e-mail di conferma)
+#   BREVO_API_KEY           (facoltativo, alternativa) chiave Brevo per le e-mail di conferma
 name: Pubblica il motore delle prenotazioni
 
 on:
@@ -29,6 +30,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PRENOTAZIONI_PASSWORD: ${{ secrets.PRENOTAZIONI_PASSWORD }}
       BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       DB_NOME: castello-prenotazioni
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +40,7 @@ jobs:
           node-version: "22"
 
       - name: Prove del motore
-        run: node test/prova.mjs
+        run: node test/prova.mjs && node test/prova-smtp.mjs
 
       - name: Controlla le chiavi Cloudflare
         id: chiavi
@@ -82,3 +84,7 @@ jobs:
       - name: Imposta la chiave per le e-mail di conferma
         if: steps.chiavi.outputs.ok == 'si' && env.BREVO_API_KEY != ''
         run: printf '%s' "$BREVO_API_KEY" | npx --yes wrangler@4 secret put BREVO_API_KEY
+
+      - name: Imposta la password della posta per le e-mail di conferma
+        if: steps.chiavi.outputs.ok == 'si' && env.SMTP_PASSWORD != ''
+        run: printf '%s' "$SMTP_PASSWORD" | tr -d ' ' | npx --yes wrangler@4 secret put SMTP_PASSWORD

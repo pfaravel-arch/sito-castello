@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { fintoServer } from "./prova-smtp.mjs";
 import worker, { fasceDi, prenotazioniAperte, slug, dataEstesa } from "../src/index.js";
 
 export function creaD1() {
@@ -44,7 +45,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const TOKEN = "codice-area-di-prova";
   const env = { DB: creaD1(), SITO: "https://sito", ORIGINI: "https://www.castellodisilvanopietra.com", ADMIN_PASSWORD: "segreta",
     AREA_TOKEN_SHA256: createHash("sha256").update(TOKEN).digest("hex"), BREVO_API_KEY: "chiave-prova",
-    EMAIL_MITTENTE: "prenotazioni@castellodisilvanopietra.com", EMAIL_RISPOSTA: "castellodisilvanopietra@gmail.com", EMAIL_COPIA: "castellodisilvanopietra@gmail.com" };
+    SMTP_HOST: "smtp.gmail.com", SMTP_PORTA: "465", SMTP_UTENTE: "castellodisilvanopietra@gmail.com", EMAIL_NOME: "Castello di Silvano Pietra APS",
+    EMAIL_MITTENTE: "castellodisilvanopietra@gmail.com", EMAIL_RISPOSTA: "castellodisilvanopietra@gmail.com", EMAIL_COPIA: "castellodisilvanopietra@gmail.com" };
   const attese = [];
   const ctx = { waitUntil: (p) => attese.push(p) };
   const A = { "X-Password": "segreta" };
@@ -174,6 +176,22 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // CORS da origine non ammessa
   const res = await worker.fetch(new Request("https://w/calendario", { headers: { Origin: "https://altro.it" } }), env);
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), null);
+
+  // e-mail via Gmail (SMTP) quando c'e' SMTP_PASSWORD: ha la precedenza su Brevo
+  const gm = fintoServer();
+  r = await chiama("POST", "/admin/eventi", { titolo: "Visita guidata", data: giorno(12), stato: "pubblicato", pren_attive: true, pren_posti: 30 }, A);
+  const env2 = { ...env, SMTP_PASSWORD: "abcdefghijklmnop", __connetti: gm.connetti };
+  const r2 = await worker.fetch(new Request("https://w/prenotazioni", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ evento: r.dati.id, fascia: "unica", nome: "Anna", cognome: "Neri", email: "anna@example.com", persone: 2, consenso: true }) }), env2, ctx);
+  const d2 = await r2.json();
+  assert.equal(r2.status, 201, JSON.stringify(d2)); assert.equal(d2.email_conferma, true);
+  email.length = 0; await Promise.all(attese);
+  assert.equal(email.length, 0, "con Gmail non usa Brevo");
+  const messaggi = gm.ricevuti.filter((x) => x.tipo === "DATA").map((x) => x.testo);
+  assert.equal(messaggi.length, 2, "conferma + copia");
+  assert.ok(messaggi.some((m) => m.includes("To: \"Anna Neri\" <anna@example.com>")));
+  assert.ok(gm.ricevuti.some((x) => x.testo === "MAIL FROM:<castellodisilvanopietra@gmail.com>"));
+  assert.ok(!messaggi[0].includes("Reply-To"), "mittente e risposta coincidono: niente Reply-To");
 
   console.log("Tutte le prove superate.");
 }

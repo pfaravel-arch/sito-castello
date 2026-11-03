@@ -14,8 +14,12 @@ ORIGINI = "https://www.castellodisilvanopietra.com,https://castellodisilvanopiet
 # Impronta SHA-256 del codice di accesso custodito (cifrato) nell'area riservata del sito:
 # chi entra nell'area riservata e' gia' autenticato anche qui. L'impronta non permette di risalire al codice.
 AREA_TOKEN_SHA256 = "df72319db82dc5023e90e3d0ee68d75658cabfdce9d502c0f2707904fc77c245"
-# E-mail di conferma delle prenotazioni (inviate con Brevo se c'e' il segreto BREVO_API_KEY)
-EMAIL_MITTENTE = "prenotazioni@castellodisilvanopietra.com"
+# E-mail di conferma delle prenotazioni: inviate dalla Gmail del Castello (SMTP con password per le app,
+# segreto SMTP_PASSWORD). In alternativa Brevo, se c'e' il segreto BREVO_API_KEY e non SMTP_PASSWORD.
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORTA = "465"
+SMTP_UTENTE = "castellodisilvanopietra@gmail.com"
+EMAIL_MITTENTE = "castellodisilvanopietra@gmail.com"
 EMAIL_NOME = "Castello di Silvano Pietra APS"
 EMAIL_RISPOSTA = "castellodisilvanopietra@gmail.com"
 # Copia di ogni prenotazione all'associazione (lasciare vuoto per non riceverla)
