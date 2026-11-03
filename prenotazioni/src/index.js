@@ -53,8 +53,8 @@ async function instrada(request, env, ctx) {
   if (m === "GET" && p === "/") return json({ servizio: "Eventi e prenotazioni Castello di Silvano Pietra", stato: "attivo" });
   if (m === "GET" && p === "/calendario") return calendario(env, url);
   if (m === "GET" && (r = p.match(/^\/locandine\/([a-z0-9-]{1,60})$/))) return locandina(env, r[1]);
-  if (m === "GET" && (r = p.match(/^\/eventi\/([a-z0-9-]{1,60})$/))) return disponibilita(env, r[1]);
-  if (m === "POST" && p === "/prenotazioni") return prenota(env, await leggiJson(request), ctx);
+  if (m === "GET" && (r = p.match(/^\/eventi\/([a-z0-9-]{1,60})$/))) return disponibilita(env, r[1], await eAdmin(request, env));
+  if (m === "POST" && p === "/prenotazioni") return prenota(env, await leggiJson(request), ctx, await eAdmin(request, env));
 
   if (p.startsWith("/admin/")) {
     await controllaPassword(request, env);
@@ -128,9 +128,10 @@ async function locandina(env, id) {
   return new Response(corpo, { headers: { "Content-Type": r.locandina_tipo, "Cache-Control": "public, max-age=31536000, immutable" } });
 }
 
-async function eventoPrenotabile(env, id, origine = "") {
+// Le bozze si possono prenotare solo da chi e' entrato nell'area riservata (per le prove)
+async function eventoPrenotabile(env, id, admin = false, origine = "") {
   const r = await rigaEvento(env, id).catch(() => null);
-  if (!r || !r.pren_attive || r.stato === "bozza") throw new Errore("Evento non trovato o non prenotabile.", 404);
+  if (!r || !r.pren_attive || (r.stato === "bozza" && !admin)) throw new Errore("Evento non trovato o non prenotabile.", 404);
   const e = evento(r, origine);
   e.chiuso = r.stato === "chiuso";
   return e;
@@ -279,12 +280,14 @@ async function adminModifica(env, id, d, origine) {
   return json(perAdmin(await rigaEvento(env, id), origine));
 }
 
+// Un evento con prenotazioni si elimina solo se e' ancora in bozza (prenotazioni di prova, cancellate con lui)
 async function adminElimina(env, id) {
-  await rigaEvento(env, id);
+  const r = await rigaEvento(env, id);
   const c = await env.DB.prepare("SELECT COUNT(*) AS n FROM prenotazioni WHERE evento = ?").bind(id).first();
-  if (Number(c.n) > 0) throw new Errore("L'evento ha delle prenotazioni: invece di eliminarlo, impostalo come «Chiuso».", 409);
+  if (Number(c.n) > 0 && r.stato !== "bozza") throw new Errore("L'evento ha delle prenotazioni: invece di eliminarlo, impostalo come «Chiuso».", 409);
+  await env.DB.prepare("DELETE FROM prenotazioni WHERE evento = ?").bind(id).run();
   await env.DB.prepare("DELETE FROM eventi WHERE id = ?").bind(id).run();
-  return json({ id, eliminato: true });
+  return json({ id, eliminato: true, prenotazioni_eliminate: Number(c.n) });
 }
 
 async function adminCaricaLocandina(env, id, request) {
@@ -316,20 +319,20 @@ async function occupati(env, evento) {
   return mappa;
 }
 
-async function disponibilita(env, id) {
-  const ev = await eventoPrenotabile(env, id);
+async function disponibilita(env, id, admin) {
+  const ev = await eventoPrenotabile(env, id, admin);
   const posti = ev.prenotazioni.posti;
   const occ = await occupati(env, id);
   return json({
-    id, titolo: ev.titolo, data: ev.data, luogo: ev.luogo, aperte: prenotazioniAperte(ev),
+    id, titolo: ev.titolo, data: ev.data, luogo: ev.luogo, aperte: prenotazioniAperte(ev), bozza: ev.stato === "bozza",
     max_per_prenotazione: Math.min(posti, ev.prenotazioni.max_per_prenotazione),
     fasce: fasceDi(ev).map((ora) => ({ ora, totale: posti, liberi: Math.max(0, posti - (occ[ora] || 0)) })),
   });
 }
 
-async function prenota(env, d, ctx) {
+async function prenota(env, d, ctx, admin) {
   if (d.sito_web) throw new Errore("Richiesta non valida."); // campo esca per i robot
-  const ev = await eventoPrenotabile(env, testo(d.evento, 60));
+  const ev = await eventoPrenotabile(env, testo(d.evento, 60), admin);
   if (!prenotazioniAperte(ev)) throw new Errore("Le prenotazioni per questo evento sono chiuse.", 409);
 
   const fascia = testo(d.fascia, 10);
@@ -460,6 +463,11 @@ async function inviaEmailPrenotazione(env, ev, p) {
 }
 
 // ---------- area riservata ----------
+
+async function eAdmin(request, env) {
+  if (!request.headers.get("X-Password")) return false;
+  try { await controllaPassword(request, env); return true; } catch { return false; }
+}
 
 // Accesso con la password ADMIN_PASSWORD oppure con il codice custodito nell'area riservata del sito
 async function controllaPassword(request, env) {

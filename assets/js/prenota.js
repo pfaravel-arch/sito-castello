@@ -9,8 +9,11 @@
   function contatti(msg){
     box.innerHTML='<p class="avviso-modulo">'+esc(msg)+'</p><p>Puoi prenotare scrivendo a <a href="mailto:castellodisilvanopietra@gmail.com">castellodisilvanopietra@gmail.com</a> o su WhatsApp al <a href="https://wa.me/393513479312">351 347 9312</a>.</p>';
   }
+  // chi e' entrato nell'area riservata puo' provare le prenotazioni sugli eventi in bozza
+  var staff=''; try{staff=sessionStorage.getItem('gp')||'';}catch(e){}
   function chiamata(metodo,percorso,corpo){
-    return fetch(API+percorso,{method:metodo,headers:{'Content-Type':'application/json'},body:corpo?JSON.stringify(corpo):undefined})
+    var h={'Content-Type':'application/json'}; if(staff) h['X-Password']=staff;
+    return fetch(API+percorso,{method:metodo,headers:h,body:corpo?JSON.stringify(corpo):undefined})
       .then(function(r){return r.json().catch(function(){return{};}).then(function(d){if(!r.ok) throw new Error(d.errore||'Errore '+r.status);return d;});});
   }
 
@@ -25,7 +28,7 @@
 
   function mostra(ev){
     document.title='Prenota: '+ev.titolo+' | Castello di Silvano Pietra';
-    var h='<p class="dettagli-evento">'+esc(dataLunga(ev.data))+(ev.luogo?', '+esc(ev.luogo):'')+'</p><h1>'+esc(ev.titolo)+'</h1>';
+    var h=(ev.bozza?'<p class="avviso-prova">Prova: questo evento è in bozza e il pubblico non lo vede. Le prenotazioni fatte qui spariscono quando elimini la bozza.</p>':'')+'<p class="dettagli-evento">'+esc(dataLunga(ev.data))+(ev.luogo?', '+esc(ev.luogo):'')+'</p><h1>'+esc(ev.titolo)+'</h1>';
     if(!ev.aperte){contatti('Le prenotazioni online per questo evento sono chiuse.');box.insertAdjacentHTML('afterbegin',h);return;}
     var liberiTot=ev.fasce.reduce(function(s,f){return s+f.liberi;},0);
     if(!liberiTot){box.innerHTML=h+'<p class="avviso-modulo">Tutti i posti sono esauriti. Scrivici: se si libera un posto ti avvisiamo.</p>';return;}

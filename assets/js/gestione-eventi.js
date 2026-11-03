@@ -46,8 +46,9 @@
       '<div class="riga-testo"><p class="riga-data">'+esc(dataBreve(e))+'</p><h3>'+esc(e.titolo)+'</h3><p>'+etichette(e)+'</p></div>'+
       '<div class="riga-azioni"><button type="button" class="bottone" data-a="modifica" data-id="'+esc(e.id)+'">Modifica</button>'+
       '<button type="button" class="link-azione" data-a="duplica" data-id="'+esc(e.id)+'">Duplica</button>'+
+      (e.pren_attive&&e.stato!=='chiuso'?'<a class="link-azione" href="/prenota.html?evento='+encodeURIComponent(e.id)+'">'+(e.stato==='bozza'?'Prova la prenotazione':'Pagina di prenotazione')+'</a>':'')+
       (e.pren_attive?'<a class="link-azione" href="/gestione-prenotazioni.html">Prenotazioni</a>':'')+
-      (!e.prenotazioni?'<button type="button" class="link-azione" data-a="elimina" data-id="'+esc(e.id)+'">Elimina</button>':'')+
+      (!e.prenotazioni||e.stato==='bozza'?'<button type="button" class="link-azione" data-a="elimina" data-id="'+esc(e.id)+'" data-n="'+(e.prenotazioni||0)+'">Elimina</button>':'')+
       '</div></li>';
   }
   function disegnaElenco(){
@@ -69,8 +70,8 @@
       if(a==='modifica') return chiamata('GET','/admin/eventi/'+id).then(function(e){editor(e,false);}).catch(errore);
       if(a==='duplica') return chiamata('GET','/admin/eventi/'+id).then(function(e){editor(e,true);}).catch(errore);
       if(a==='elimina'){
-        if(b.dataset.conferma!=='1'){b.dataset.conferma='1';b.textContent='Conferma eliminazione';b.classList.add('attenzione');return;}
-        chiamata('DELETE','/admin/eventi/'+id).then(function(){avviso='Evento eliminato.';elenco();}).catch(errore);
+        if(b.dataset.conferma!=='1'){b.dataset.conferma='1';b.textContent=Number(b.dataset.n)?'Conferma: elimina anche '+(b.dataset.n==='1'?'la prenotazione':'le '+b.dataset.n+' prenotazioni')+' di prova':'Conferma eliminazione';b.classList.add('attenzione');return;}
+        chiamata('DELETE','/admin/eventi/'+id).then(function(r){avviso='Evento eliminato'+(r.prenotazioni_eliminate?', insieme a '+(r.prenotazioni_eliminate===1?'una prenotazione':r.prenotazioni_eliminate+' prenotazioni')+' di prova.':'.');elenco();}).catch(errore);
       }
     };});
   }

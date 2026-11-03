@@ -85,7 +85,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal(r.dati.id, id + "-2", "id unico");
   assert.equal((await chiama("DELETE", "/admin/eventi/" + id + "-2", null, A)).status, 200);
   assert.equal((await chiama("GET", "/calendario")).dati.length, 1);
-  assert.equal((await chiama("GET", "/eventi/" + id)).status, 404, "bozza non prenotabile");
+  assert.equal((await chiama("GET", "/eventi/" + id)).status, 404, "bozza non prenotabile dal pubblico");
+  r = await chiama("GET", "/eventi/" + id, null, A); assert.equal(r.status, 200); assert.equal(r.dati.bozza, true);
+  r = await chiama("POST", "/prenotazioni", { evento: id, fascia: "15:30", nome: "Prova", cognome: "Prova", telefono: "3330000000", persone: 2, consenso: true }, A);
+  assert.equal(r.status, 201, "prova sulla bozza dall'area riservata");
+  assert.equal((await chiama("POST", "/prenotazioni", { evento: id, fascia: "15:00", nome: "X", cognome: "Y", telefono: "3330000000", persone: 1, consenso: true })).status, 404);
+  // la bozza con prenotazioni di prova si elimina insieme alle prenotazioni
+  r = await chiama("POST", "/admin/eventi", { titolo: "Prova bozza", data: giorno(9), pren_attive: true }, A);
+  const idProva = r.dati.id;
+  await chiama("POST", "/prenotazioni", { evento: idProva, fascia: "unica", nome: "P", cognome: "Q", telefono: "3330000000", persone: 1, consenso: true }, A);
+  r = await chiama("DELETE", "/admin/eventi/" + idProva, null, A);
+  assert.equal(r.status, 200); assert.equal(r.dati.prenotazioni_eliminate, 1);
+  assert.equal((await chiama("GET", "/admin/prenotazioni?evento=" + idProva, null, A)).dati.length, 0);
+  await Promise.all(attese); attese.length = 0;
 
   // pubblicazione e locandina
   r = await chiama("GET", "/admin/eventi/" + id, null, A);
@@ -138,10 +150,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // area riservata prenotazioni
   r = await chiama("GET", "/admin/eventi?prenotabili=1", null, A);
-  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 18); assert.equal(r.dati[0].aperte, true);
+  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 20); assert.equal(r.dati[0].aperte, true);
   assert.equal((await chiama("GET", "/admin/eventi", null, A)).dati.length, 2);
   const elenco = (await chiama("GET", "/admin/prenotazioni?evento=" + id, null, A)).dati;
-  assert.equal(elenco.length, 5); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
+  assert.equal(elenco.length, 6); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
   assert.equal(elenco.find((x) => x.socio === "richiesta").tessera, null, "chi chiede di aderire non ha tessera");
   assert.equal((await chiama("PATCH", "/admin/prenotazioni/" + codice, { stato: "annullata" }, A)).status, 200);
   assert.equal((await chiama("GET", "/eventi/" + id)).dati.fasce[0].liberi, 4);
