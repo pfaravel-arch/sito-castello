@@ -25,7 +25,7 @@
   }
 
   function carica(){
-    chiamata('GET','/admin/eventi').then(function(l){
+    chiamata('GET','/admin/eventi?prenotabili=1').then(function(l){
       salva('gp',PWD); eventi=l;
       if(!l.length){box.innerHTML='<p>Nessun evento prenotabile. Aggiungi un evento con prenotazioni nel calendario.</p>'+esci();legaEsci();return;}
       var sel=leggi('ge'); corrente=l.find(function(e){return e.id===sel;})||l.filter(function(e){return e.aperte;})[0]||l[0];

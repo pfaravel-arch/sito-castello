@@ -1,15 +1,28 @@
-// Motore delle prenotazioni del Castello di Silvano Pietra APS.
-// Gira su Cloudflare Workers, salva le prenotazioni nel database D1 "DB".
+// Motore eventi e prenotazioni del Castello di Silvano Pietra APS.
+// Gira su Cloudflare Workers; eventi, locandine e prenotazioni stanno nel database D1 "DB".
 //
 // Pubblico:
-//   GET  /eventi/:id         fasce orarie e posti liberi di un evento
-//   POST /prenotazioni       crea una prenotazione (controlla i posti in modo atomico)
+//   GET  /calendario             eventi pubblicati (per le pagine Home ed Eventi)
+//   GET  /locandine/:id          immagine della locandina
+//   GET  /eventi/:id             fasce orarie e posti liberi di un evento prenotabile
+//   POST /prenotazioni           crea una prenotazione (controlla i posti in modo atomico)
 // Riservato (intestazione "X-Password" = segreto ADMIN_PASSWORD):
-//   GET   /admin/eventi                  eventi prenotabili con i totali
-//   GET   /admin/prenotazioni?evento=ID  elenco prenotazioni
-//   PATCH /admin/prenotazioni/:codice    { pagato: true|false, stato: "confermata"|"annullata" }
+//   GET    /admin/eventi[?prenotabili=1]     eventi con i totali delle prenotazioni
+//   GET    /admin/eventi/:id                 scheda completa di un evento
+//   POST   /admin/eventi                     nuovo evento
+//   PUT    /admin/eventi/:id                 modifica evento
+//   DELETE /admin/eventi/:id                 elimina (solo senza prenotazioni)
+//   PUT    /admin/eventi/:id/locandina       carica locandina (corpo = immagine)
+//   DELETE /admin/eventi/:id/locandina       toglie la locandina
+//   GET    /admin/prenotazioni?evento=ID     elenco prenotazioni
+//   PATCH  /admin/prenotazioni/:codice       { pagato, stato }
+//
+// Al primo uso, se la tabella eventi e' vuota, importa data/eventi.json del sito (con le locandine).
 
 const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // senza 0/O e 1/I
+const STATI = ["bozza", "pubblicato", "chiuso"];
+const TIPI_IMMAGINE = ["image/jpeg", "image/png", "image/webp"];
+const MAX_LOCANDINA = 1_800_000;
 
 export default {
   async fetch(request, env) {
@@ -35,66 +48,264 @@ async function instrada(request, env) {
   const url = new URL(request.url);
   const p = url.pathname.replace(/\/+$/, "") || "/";
   const m = request.method;
-
-  if (m === "GET" && p === "/") return json({ servizio: "Prenotazioni Castello di Silvano Pietra", stato: "attivo" });
-
   let r;
+
+  if (m === "GET" && p === "/") return json({ servizio: "Eventi e prenotazioni Castello di Silvano Pietra", stato: "attivo" });
+  if (m === "GET" && p === "/calendario") return calendario(env, url);
+  if (m === "GET" && (r = p.match(/^\/locandine\/([a-z0-9-]{1,60})$/))) return locandina(env, r[1]);
   if (m === "GET" && (r = p.match(/^\/eventi\/([a-z0-9-]{1,60})$/))) return disponibilita(env, r[1]);
   if (m === "POST" && p === "/prenotazioni") return prenota(env, await leggiJson(request));
 
   if (p.startsWith("/admin/")) {
     await controllaPassword(request, env);
-    if (m === "GET" && p === "/admin/eventi") return adminEventi(env);
+    if (m === "GET" && p === "/admin/eventi") return adminEventi(env, url.searchParams.get("prenotabili") === "1");
+    if (m === "POST" && p === "/admin/eventi") return adminCrea(env, await leggiJson(request));
+    if ((r = p.match(/^\/admin\/eventi\/([a-z0-9-]{1,60})\/locandina$/))) {
+      if (m === "PUT") return adminCaricaLocandina(env, r[1], request);
+      if (m === "DELETE") return adminTogliLocandina(env, r[1]);
+    }
+    if ((r = p.match(/^\/admin\/eventi\/([a-z0-9-]{1,60})$/))) {
+      if (m === "GET") return json(perAdmin(await rigaEvento(env, r[1]), url.origin));
+      if (m === "PUT") return adminModifica(env, r[1], await leggiJson(request), url.origin);
+      if (m === "DELETE") return adminElimina(env, r[1]);
+    }
     if (m === "GET" && p === "/admin/prenotazioni") return adminElenco(env, url.searchParams.get("evento"));
     if (m === "PATCH" && (r = p.match(/^\/admin\/prenotazioni\/([A-Z0-9]{6})$/))) return adminAggiorna(env, r[1], await leggiJson(request));
   }
   throw new Errore("Indirizzo non trovato.", 404);
 }
 
-// ---------- eventi ----------
+// ---------- eventi: lettura ----------
 
-async function eventiPrenotabili(env) {
-  const res = await fetch(env.SITO + "/data/eventi.json", { cf: { cacheTtl: 60 } });
-  if (!res.ok) throw new Errore("Il calendario eventi non è raggiungibile.", 502);
-  const lista = await res.json();
-  return lista.filter((e) => e.prenotazioni && e.prenotazioni.id);
+const COLONNE = "id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, locandina_tipo, locandina_ver";
+
+async function rigaEvento(env, id) {
+  await importaSeVuoto(env);
+  const r = await env.DB.prepare(`SELECT ${COLONNE} FROM eventi WHERE id = ?`).bind(id).first();
+  if (!r) throw new Errore("Evento non trovato.", 404);
+  return r;
 }
 
-async function trovaEvento(env, id) {
-  const ev = (await eventiPrenotabili(env)).find((e) => e.prenotazioni.id === id);
-  if (!ev) throw new Errore("Evento non trovato o non prenotabile.", 404);
-  return ev;
+function fasceDaRiga(r) {
+  if (!r.pren_fasce) return null;
+  try { return JSON.parse(r.pren_fasce); } catch { return null; }
 }
 
-// Fasce orarie: elenco esplicito ["17:00", ...] oppure { dalle, alle, ogni (minuti) }
+// Forma comune usata da prenotazioni e pagine: { ..., prenotazioni: {id, fasce, posti, ...} | null }
+function evento(r, origine) {
+  return {
+    id: r.id, titolo: r.titolo, data: r.data, fine: r.fine || null, orario: r.orario || "", luogo: r.luogo || "",
+    descrizione: r.descrizione || "", avviso: r.avviso || "", stato: r.stato, in_evidenza: !!r.in_evidenza,
+    locandina: r.locandina_tipo ? `${origine}/locandine/${r.id}?v=${r.locandina_ver}` : null,
+    prenotazioni: r.pren_attive ? {
+      id: r.id, fasce: fasceDaRiga(r), posti: Number(r.pren_posti) || 15,
+      max_per_prenotazione: Number(r.pren_max) || Number(r.pren_posti) || 15, chiusura: r.pren_chiusura || null,
+    } : null,
+  };
+}
+
+function perAdmin(r, origine) {
+  return { ...evento(r, origine), pren_attive: !!r.pren_attive, pren_fasce: fasceDaRiga(r),
+    pren_posti: Number(r.pren_posti), pren_max: Number(r.pren_max), pren_chiusura: r.pren_chiusura || "" };
+}
+
+async function calendario(env, url) {
+  await importaSeVuoto(env);
+  const { results } = await env.DB.prepare(
+    `SELECT ${COLONNE} FROM eventi WHERE stato != 'bozza' ORDER BY data`
+  ).all();
+  return json(results.map((r) => {
+    const e = evento(r, url.origin);
+    if (e.prenotazioni) e.prenotazioni = { aperte: r.stato === "pubblicato" && prenotazioniAperte(e) };
+    return e;
+  }), 200, { "Cache-Control": "public, max-age=30" });
+}
+
+async function locandina(env, id) {
+  const r = await env.DB.prepare("SELECT locandina, locandina_tipo FROM eventi WHERE id = ?").bind(id).first();
+  if (!r || !r.locandina) throw new Errore("Locandina non trovata.", 404);
+  const corpo = r.locandina instanceof ArrayBuffer ? r.locandina : new Uint8Array(r.locandina);
+  return new Response(corpo, { headers: { "Content-Type": r.locandina_tipo, "Cache-Control": "public, max-age=31536000, immutable" } });
+}
+
+async function eventoPrenotabile(env, id, origine = "") {
+  const r = await rigaEvento(env, id).catch(() => null);
+  if (!r || !r.pren_attive || r.stato === "bozza") throw new Errore("Evento non trovato o non prenotabile.", 404);
+  const e = evento(r, origine);
+  e.chiuso = r.stato === "chiuso";
+  return e;
+}
+
+// Fasce orarie: elenco esplicito ["17:00", ...] oppure { dalle, alle, ogni (minuti) }; senza fasce: "unica"
 export function fasceDi(ev) {
   const f = ev.prenotazioni.fasce;
-  if (Array.isArray(f)) return f;
+  if (Array.isArray(f) && f.length) return f;
   if (f && f.dalle && f.alle && f.ogni) {
     const min = (s) => { const [h, mm] = s.split(":").map(Number); return h * 60 + mm; };
     const out = [];
     for (let t = min(f.dalle); t <= min(f.alle); t += Number(f.ogni)) {
       out.push(String(Math.floor(t / 60) % 24).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"));
     }
-    return out;
+    if (out.length) return out;
   }
   return ["unica"];
 }
 
 // Le prenotazioni chiudono all'orario "chiusura" (ora italiana) o, se manca, alla fine del giorno dell'evento
 export function prenotazioniAperte(ev, adesso = new Date()) {
+  if (ev.chiuso || ev.stato === "chiuso") return false;
   const chiusura = ev.prenotazioni.chiusura || (ev.fine || ev.data) + "T23:59";
   return adesso < oraItaliana(chiusura);
 }
 
 function oraItaliana(s) {
-  // "2026-12-07T12:00" letto come ora di Roma, con il cambio ora legale gestito da Intl
   const [d, t = "00:00"] = s.split("T");
   const utc = new Date(d + "T" + t + ":00Z");
   const roma = new Date(utc.toLocaleString("en-US", { timeZone: "Europe/Rome" }));
   const base = new Date(utc.toLocaleString("en-US", { timeZone: "UTC" }));
   return new Date(utc.getTime() - (roma - base));
 }
+
+// ---------- import iniziale da data/eventi.json ----------
+
+let importato = false;
+async function importaSeVuoto(env) {
+  if (importato) return;
+  const c = await env.DB.prepare("SELECT COUNT(*) AS n FROM eventi").first();
+  if (Number(c.n) > 0) { importato = true; return; }
+  let lista = [];
+  try {
+    const res = await fetch(env.SITO + "/data/eventi.json");
+    if (res.ok) lista = await res.json();
+  } catch { /* sito irraggiungibile: si riprova alla prossima richiesta */ return; }
+  for (const e of lista) {
+    if (!e.titolo || !/^\d{4}-\d{2}-\d{2}$/.test(e.data || "")) continue;
+    const id = (e.prenotazioni && e.prenotazioni.id) || slug(e.titolo, e.data);
+    const p = e.prenotazioni || null;
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO eventi (id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pubblicato', ?, ?, ?, ?, ?)`
+    ).bind(id, e.titolo, e.data, e.fine || null, e.orario || null, e.luogo || null, e.descrizione || null, e.avviso || null,
+      p ? 1 : 0, p && p.fasce ? JSON.stringify(p.fasce) : null, Number(p && p.posti) || 15, Number(p && p.max_per_prenotazione) || 10,
+      (p && p.chiusura) || null).run();
+    if (e.locandina) {
+      try {
+        const img = await fetch(new URL(e.locandina, env.SITO).toString());
+        const tipo = (img.headers.get("Content-Type") || "").split(";")[0];
+        if (img.ok && TIPI_IMMAGINE.includes(tipo)) {
+          const b = await img.arrayBuffer();
+          if (b.byteLength <= MAX_LOCANDINA) {
+            await env.DB.prepare("UPDATE eventi SET locandina = ?, locandina_tipo = ?, locandina_ver = 1 WHERE id = ?").bind(b, tipo, id).run();
+          }
+        }
+      } catch { /* locandina non essenziale */ }
+    }
+  }
+  importato = true;
+}
+
+export function slug(titolo, data) {
+  const base = String(titolo).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 45).replace(/-+$/, "") || "evento";
+  return `${base}-${String(data).slice(0, 4)}`;
+}
+
+// ---------- eventi: gestione ----------
+
+const testo = (v, max) => String(v == null ? "" : v).trim().replace(/\s+/g, " ").slice(0, max);
+const testoLungo = (v, max) => String(v == null ? "" : v).replace(/\r\n/g, "\n").trim().slice(0, max);
+const ORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+function validaEvento(d) {
+  const titolo = testo(d.titolo, 120);
+  if (!titolo) throw new Errore("Il titolo è obbligatorio.");
+  const data = testo(d.data, 10);
+  if (!DATA.test(data)) throw new Errore("La data dell'evento non è valida.");
+  const fine = testo(d.fine, 10) || null;
+  if (fine && (!DATA.test(fine) || fine < data)) throw new Errore("La data di fine deve essere uguale o successiva alla data di inizio.");
+  const stato = STATI.includes(d.stato) ? d.stato : "bozza";
+  const pren = !!d.pren_attive;
+  let fasce = null;
+  if (pren && d.pren_fasce) {
+    if (Array.isArray(d.pren_fasce)) {
+      fasce = d.pren_fasce.map((x) => testo(x, 5)).filter((x) => ORA.test(x));
+      if (!fasce.length) fasce = null;
+    } else {
+      const f = d.pren_fasce;
+      if (!ORA.test(f.dalle || "") || !ORA.test(f.alle || "")) throw new Errore("Indica gli orari della prima e dell'ultima partenza (es. 17:00).");
+      const ogni = Number.parseInt(f.ogni, 10);
+      if (!(ogni >= 5 && ogni <= 600)) throw new Errore("L'intervallo tra le partenze deve essere tra 5 e 600 minuti.");
+      if (f.alle < f.dalle) throw new Errore("L'ultima partenza deve essere dopo la prima.");
+      fasce = { dalle: f.dalle, alle: f.alle, ogni };
+    }
+  }
+  const posti = Number.parseInt(d.pren_posti, 10) || 15;
+  if (pren && (posti < 1 || posti > 2000)) throw new Errore("I posti devono essere tra 1 e 2000.");
+  const max = Math.min(posti, Number.parseInt(d.pren_max, 10) || posti);
+  const chiusura = testo(d.pren_chiusura, 16) || null;
+  if (chiusura && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(chiusura)) throw new Errore("La data di chiusura delle prenotazioni non è valida.");
+  return {
+    titolo, data, fine, stato, orario: testo(d.orario, 160) || null, luogo: testo(d.luogo, 160) || null,
+    descrizione: testoLungo(d.descrizione, 3000) || null, avviso: testoLungo(d.avviso, 600) || null,
+    in_evidenza: d.in_evidenza ? 1 : 0, pren_attive: pren ? 1 : 0, pren_fasce: fasce ? JSON.stringify(fasce) : null,
+    pren_posti: posti, pren_max: Math.max(1, max), pren_chiusura: chiusura,
+  };
+}
+
+async function adminCrea(env, d) {
+  await importaSeVuoto(env);
+  const v = validaEvento(d);
+  let id = slug(v.titolo, v.data);
+  for (let i = 2; await env.DB.prepare("SELECT 1 FROM eventi WHERE id = ?").bind(id).first(); i++) id = `${slug(v.titolo, v.data)}-${i}`;
+  if (v.in_evidenza) await env.DB.prepare("UPDATE eventi SET in_evidenza = 0").run();
+  await env.DB.prepare(
+    `INSERT INTO eventi (id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(id, v.titolo, v.data, v.fine, v.orario, v.luogo, v.descrizione, v.avviso, v.stato, v.in_evidenza,
+    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura).run();
+  return json({ id }, 201);
+}
+
+async function adminModifica(env, id, d, origine) {
+  await rigaEvento(env, id);
+  const v = validaEvento(d);
+  if (v.in_evidenza) await env.DB.prepare("UPDATE eventi SET in_evidenza = 0 WHERE id != ?").bind(id).run();
+  await env.DB.prepare(
+    `UPDATE eventi SET titolo = ?, data = ?, fine = ?, orario = ?, luogo = ?, descrizione = ?, avviso = ?, stato = ?, in_evidenza = ?,
+       pren_attive = ?, pren_fasce = ?, pren_posti = ?, pren_max = ?, pren_chiusura = ?, aggiornato = datetime('now') WHERE id = ?`
+  ).bind(v.titolo, v.data, v.fine, v.orario, v.luogo, v.descrizione, v.avviso, v.stato, v.in_evidenza,
+    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, id).run();
+  return json(perAdmin(await rigaEvento(env, id), origine));
+}
+
+async function adminElimina(env, id) {
+  await rigaEvento(env, id);
+  const c = await env.DB.prepare("SELECT COUNT(*) AS n FROM prenotazioni WHERE evento = ?").bind(id).first();
+  if (Number(c.n) > 0) throw new Errore("L'evento ha delle prenotazioni: invece di eliminarlo, impostalo come «Chiuso».", 409);
+  await env.DB.prepare("DELETE FROM eventi WHERE id = ?").bind(id).run();
+  return json({ id, eliminato: true });
+}
+
+async function adminCaricaLocandina(env, id, request) {
+  await rigaEvento(env, id);
+  const tipo = (request.headers.get("Content-Type") || "").split(";")[0].trim();
+  if (!TIPI_IMMAGINE.includes(tipo)) throw new Errore("La locandina deve essere un'immagine JPG, PNG o WebP.");
+  const b = await request.arrayBuffer();
+  if (!b.byteLength) throw new Errore("Immagine vuota.");
+  if (b.byteLength > MAX_LOCANDINA) throw new Errore("Immagine troppo grande (massimo 1,8 MB).", 413);
+  await env.DB.prepare("UPDATE eventi SET locandina = ?, locandina_tipo = ?, locandina_ver = locandina_ver + 1, aggiornato = datetime('now') WHERE id = ?")
+    .bind(b, tipo, id).run();
+  return json({ id, locandina: true });
+}
+
+async function adminTogliLocandina(env, id) {
+  await rigaEvento(env, id);
+  await env.DB.prepare("UPDATE eventi SET locandina = NULL, locandina_tipo = NULL, locandina_ver = locandina_ver + 1 WHERE id = ?").bind(id).run();
+  return json({ id, locandina: false });
+}
+
+// ---------- prenotazioni ----------
 
 async function occupati(env, evento) {
   const { results } = await env.DB.prepare(
@@ -106,27 +317,19 @@ async function occupati(env, evento) {
 }
 
 async function disponibilita(env, id) {
-  const ev = await trovaEvento(env, id);
-  const posti = Number(ev.prenotazioni.posti) || 15;
+  const ev = await eventoPrenotabile(env, id);
+  const posti = ev.prenotazioni.posti;
   const occ = await occupati(env, id);
   return json({
-    id,
-    titolo: ev.titolo,
-    data: ev.data,
-    luogo: ev.luogo || "",
-    aperte: prenotazioniAperte(ev),
-    max_per_prenotazione: Number(ev.prenotazioni.max_per_prenotazione) || posti,
+    id, titolo: ev.titolo, data: ev.data, luogo: ev.luogo, aperte: prenotazioniAperte(ev),
+    max_per_prenotazione: Math.min(posti, ev.prenotazioni.max_per_prenotazione),
     fasce: fasceDi(ev).map((ora) => ({ ora, totale: posti, liberi: Math.max(0, posti - (occ[ora] || 0)) })),
   });
 }
 
-// ---------- prenotazione ----------
-
-const testo = (v, max) => String(v == null ? "" : v).trim().replace(/\s+/g, " ").slice(0, max);
-
 async function prenota(env, d) {
   if (d.sito_web) throw new Errore("Richiesta non valida."); // campo esca per i robot
-  const ev = await trovaEvento(env, testo(d.evento, 60));
+  const ev = await eventoPrenotabile(env, testo(d.evento, 60));
   if (!prenotazioniAperte(ev)) throw new Errore("Le prenotazioni per questo evento sono chiuse.", 409);
 
   const fascia = testo(d.fascia, 10);
@@ -138,8 +341,8 @@ async function prenota(env, d) {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Errore("L'indirizzo e-mail non sembra corretto.");
   if (telefono && !/^[+0-9 ().-]{6,30}$/.test(telefono)) throw new Errore("Il numero di telefono non sembra corretto.");
   if (!email && !telefono) throw new Errore("Lascia almeno un'e-mail o un numero di telefono, così possiamo contattarti.");
-  const posti = Number(ev.prenotazioni.posti) || 15;
-  const maxPer = Math.min(posti, Number(ev.prenotazioni.max_per_prenotazione) || posti);
+  const posti = ev.prenotazioni.posti;
+  const maxPer = Math.min(posti, ev.prenotazioni.max_per_prenotazione);
   const persone = Number.parseInt(d.persone, 10);
   if (!Number.isInteger(persone) || persone < 1 || persone > maxPer) throw new Errore(`Il numero di persone deve essere tra 1 e ${maxPer}.`);
   const socio = d.socio === "richiesta" ? "richiesta" : "si";
@@ -155,15 +358,15 @@ async function prenota(env, d) {
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE (SELECT COALESCE(SUM(persone),0) FROM prenotazioni
                 WHERE evento = ? AND fascia = ? AND stato != 'annullata') + ? <= ?`
-      ).bind(codice, ev.prenotazioni.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, note || null,
-             ev.prenotazioni.id, fascia, persone, posti).run();
+      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, note || null,
+             ev.id, fascia, persone, posti).run();
       if (!res.meta || res.meta.changes !== 1) {
-        const liberi = Math.max(0, posti - ((await occupati(env, ev.prenotazioni.id))[fascia] || 0));
+        const liberi = Math.max(0, posti - ((await occupati(env, ev.id))[fascia] || 0));
         throw new Errore(liberi
           ? `In questa fascia restano solo ${liberi} posti: riduci il numero di persone o scegli un altro orario.`
           : "Questa fascia oraria è appena stata completata: scegline un'altra.", 409);
       }
-      return json({ codice, evento: ev.prenotazioni.id, titolo: ev.titolo, data: ev.data, fascia, persone }, 201);
+      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone }, 201);
     } catch (e) {
       if (e instanceof Errore) throw e;
       if (!/UNIQUE/i.test(String(e && e.message))) throw e; // codice già usato: ne genera un altro
@@ -192,19 +395,27 @@ async function controllaPassword(request, env) {
   if (diff !== 0) throw new Errore("Password non corretta.", 401);
 }
 
-async function adminEventi(env) {
-  const eventi = await eventiPrenotabili(env);
+async function adminEventi(env, soloPrenotabili) {
+  await importaSeVuoto(env);
+  const { results: righe } = await env.DB.prepare(`SELECT ${COLONNE} FROM eventi ORDER BY data DESC`).all();
   const { results } = await env.DB.prepare(
     "SELECT evento, COUNT(*) AS prenotazioni, COALESCE(SUM(persone),0) AS persone, COALESCE(SUM(CASE WHEN pagato=1 THEN persone ELSE 0 END),0) AS pagati FROM prenotazioni WHERE stato != 'annullata' GROUP BY evento"
   ).all();
   const tot = Object.fromEntries(results.map((r) => [r.evento, r]));
-  return json(eventi.map((e) => ({
-    id: e.prenotazioni.id, titolo: e.titolo, data: e.data, aperte: prenotazioniAperte(e),
-    posti_per_fascia: Number(e.prenotazioni.posti) || 15, fasce: fasceDi(e),
-    prenotazioni: Number(tot[e.prenotazioni.id]?.prenotazioni || 0),
-    persone: Number(tot[e.prenotazioni.id]?.persone || 0),
-    pagati: Number(tot[e.prenotazioni.id]?.pagati || 0),
-  })));
+  return json(righe
+    .filter((r) => !soloPrenotabili || r.pren_attive || tot[r.id])
+    .map((r) => {
+      const e = perAdmin(r, "");
+      const conPren = r.pren_attive ? e : { ...e, prenotazioni: { fasce: e.pren_fasce, posti: e.pren_posti } };
+      return {
+        ...e, locandina: !!r.locandina_tipo, locandina_ver: Number(r.locandina_ver),
+        aperte: !!r.pren_attive && r.stato === "pubblicato" && prenotazioniAperte(conPren),
+        posti_per_fascia: e.pren_posti, fasce: fasceDi(conPren),
+        prenotazioni: Number(tot[r.id]?.prenotazioni || 0),
+        persone: Number(tot[r.id]?.persone || 0),
+        pagati: Number(tot[r.id]?.pagati || 0),
+      };
+    }));
 }
 
 async function adminElenco(env, evento) {
@@ -230,7 +441,7 @@ async function adminAggiorna(env, codice, d) {
 
 async function leggiJson(request) {
   const t = await request.text();
-  if (t.length > 5000) throw new Errore("Richiesta troppo grande.", 413);
+  if (t.length > 20000) throw new Errore("Richiesta troppo grande.", 413);
   try { return JSON.parse(t || "{}"); } catch { throw new Errore("Richiesta non valida."); }
 }
 
@@ -245,7 +456,7 @@ function intestazioniCors(request, env) {
   const origine = request.headers.get("Origin") || "";
   const ammesse = String(env.ORIGINI || "").split(",").map((s) => s.trim()).filter(Boolean);
   const h = {
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Password",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",

@@ -41,25 +41,18 @@ Dentro una sezione: `colonne` (testo + foto affiancati), `cronologia` (date in s
 `cantieri` (schede restauro con `stato`), `sostegno`, `elenco-semplice` (coppie etichetta/valore),
 `foto-segnaposto` (da sostituire con `<img>`).
 
-## Aggiungere un evento
+## Eventi
 
-Aggiungi un oggetto in `data/eventi.json`:
+Gli eventi si gestiscono da `/gestione-eventi.html` (area riservata, stessa password delle prenotazioni):
+nuovo, modifica, duplica, elimina, locandina, stato (bozza / pubblicato / chiuso), primo piano,
+prenotazioni online. Stanno nel database del motore (tabella `eventi`) e compaiono subito sul sito,
+senza ripubblicarlo.
 
-```json
-{
-  "titolo": "Visita guidata agli affreschi",
-  "data": "2026-12-08",
-  "fine": "2026-12-08",
-  "orario": "Ore 15:00",
-  "luogo": "Castello di Silvano Pietra",
-  "descrizione": "Breve descrizione.",
-  "avviso": "Facoltativo, in corsivo.",
-  "link": "/eventi.html",
-  "etichetta_link": "Come prenotare"
-}
-```
+La pagina Eventi mostra: l'evento in primo piano (quello segnato, altrimenti il prossimo), gli altri
+in programma e l'archivio dei passati (dopo la data di fine, o subito se "Chiuso").
 
-Gli eventi passano da solo da "Prossimi" a "Passati" dopo la data (o dopo `fine`).
+`data/eventi.json` resta come riserva: le pagine lo usano solo se il motore non risponde, e al primo
+avvio il motore lo ha importato (con le locandine).
 
 ## Provare in locale
 
@@ -101,24 +94,9 @@ con le prenotazioni salvate in un database Cloudflare D1. Si pubblica da solo co
 
 L'indirizzo del motore va scritto in `data/prenotazioni.json` (`"api": "https://...workers.dev"`).
 
-Per rendere prenotabile un evento, in `data/eventi.json` aggiungi:
-
-```json
-"prenotazioni": {
-  "id": "mercatini-2026",
-  "fasce": { "dalle": "15:00", "alle": "18:30", "ogni": 30 },
-  "posti": 15,
-  "max_per_prenotazione": 10,
-  "chiusura": "2026-12-07T12:00"
-}
-```
-
-- `id`: nome breve dell'evento, solo lettere minuscole, numeri e trattini; non cambiarlo dopo le prime prenotazioni.
-- `fasce`: orari di partenza; in alternativa un elenco `["17:00","17:30"]`. Senza `fasce` c'è un'unica prenotazione per l'evento.
-- `posti`: posti per ogni fascia. `chiusura` (facoltativa): ora italiana in cui chiudono le prenotazioni.
-
-Sull'evento compare il pulsante "Prenota online". Le prenotazioni si gestiscono in
-`/gestione-prenotazioni.html` (pagina non indicizzata, protetta da password).
+Le prenotazioni di un evento si attivano dalla scheda dell'evento in Gestione eventi
+(orari, posti per partenza, massimo per prenotazione, chiusura). Sull'evento compare il pulsante
+"Prenota online"; le prenotazioni si gestiscono in `/gestione-prenotazioni.html`.
 
 Prova locale del motore: `node prenotazioni/test/prova.mjs`.
 

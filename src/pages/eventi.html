@@ -3,35 +3,23 @@
   <div class="fascia-stretta">
     <h1>Eventi</h1>
     <p class="introduzione">Gli eventi al Castello sono attività dell'associazione, riservate ai soci. La tessera è valida per tutte le iniziative dell'anno associativo.</p>
-    <div data-eventi="prossimi"></div>
   </div>
 </section>
 
-<section class="fascia fascia-notte" id="halloween">
-  <div class="fascia-stretta colonne">
-    <div>
-      <h2>Delirium: come prenotare</h2>
-      <p>L'horror tour del 31 ottobre si visita solo su prenotazione, in gruppi di massimo 15 persone. Se prenoti per meno persone, verrai unito a un altro gruppo.</p>
-      <p>Le partenze sono ogni 30 minuti, dalle 17:00 alle 24:00. Scegli l'orario e scrivici con nome, cognome e numero di partecipanti.</p>
-      <p class="hero-azioni" style="justify-content:flex-start">
-        <a class="bottone" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=castellodisilvanopietra@gmail.com&amp;su=Prenotazione%20Delirium%2031%20ottobre&amp;body=Nome%20e%20cognome%3A%0AOrario%20scelto%3A%0ANumero%20di%20partecipanti%3A%0A" target="_blank" rel="noopener">Prenota con Gmail</a>
-        <a class="bottone" href="https://wa.me/393513479312?text=Ciao%2C%20vorrei%20prenotare%20Delirium%20del%2031%20ottobre" rel="noopener">Prenota su WhatsApp</a>
-      </p>
-      <p>Usi un altro programma di posta? Scrivi a <a href="mailto:castellodisilvanopietra@gmail.com?subject=Prenotazione%20Delirium%2031%20ottobre">castellodisilvanopietra@gmail.com</a>, oppure chiama o scrivi al 351 347 9312.</p>
-    </div>
-    <div>
-      <a href="/assets/img/eventi/delirium-halloween-2026.jpg" target="_blank" rel="noopener" class="locandina-grande"><img src="/assets/img/eventi/delirium-halloween-2026.jpg" alt="Locandina di Delirium al Castello di Silvano Pietra, horror tour del 31 ottobre 2026 dalle 17 alle 24" width="1054" height="1492" loading="lazy"></a>
-      <h3>Prima di venire</h3>
-      <p>Arriva con 15-30 minuti di anticipo rispetto all'orario prenotato, così l'accoglienza è pronta prima della partenza del tuo gruppo.</p>
-      <p>È un'esperienza immersiva e intensa, anche sul piano psicologico. Può risultare impegnativa per le persone più sensibili.</p>
-      <p>Per cena è attivo lo stand gastronomico della Pro Loco con polenta e salamini.</p>
-    </div>
+<section class="fascia fascia-notte" data-sezione hidden>
+  <div class="fascia-stretta" data-eventi="primo-piano"></div>
+</section>
+
+<section class="fascia" data-sezione>
+  <div class="fascia-stretta">
+    <h2>Prossimi eventi</h2>
+    <div data-eventi="prossimi" data-escludi-primo="1" data-vuoto="Gli altri appuntamenti sono in preparazione: seguici sui social per saperlo per primo."></div>
   </div>
 </section>
 
-<section class="fascia">
+<section class="fascia fascia-chiara" data-sezione>
   <div class="fascia-stretta">
     <h2>Eventi passati</h2>
-    <div data-eventi="passati" data-limite="6" data-vuoto="L'archivio degli eventi si riempirà dopo i primi appuntamenti."></div>
+    <div data-eventi="passati" data-limite="12" data-vuoto="L'archivio degli eventi si riempirà dopo i primi appuntamenti."></div>
   </div>
 </section>
