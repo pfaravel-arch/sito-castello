@@ -1,50 +1,13 @@
-<!--{"title":"Area riservata","order":97,"description":"Strumenti di gestione dell'associazione.","robots":"noindex"}-->
+<!--{"title":"Area riservata","order":97,"description":"Strumenti di gestione dell'associazione.","robots":"noindex","scripts":["/assets/js/area.js"]}-->
 <section class="fascia">
   <div class="fascia-stretta area-riservata">
     <h1>Area riservata</h1>
-    <p class="introduzione">Gli strumenti di gestione dell'associazione. Ogni strumento chiede il proprio accesso.</p>
-
-    <h2>Gestione dell'associazione</h2>
-    <div class="strumenti">
-      <a class="strumento" href="/gestione-prenotazioni.html">
-        <h3>Prenotazioni eventi</h3>
-        <p>Prenotazioni per evento e orario, posti occupati, pagato, annullamenti, Excel e stampa per l'accoglienza.</p>
-        <span class="accesso-con">Password delle prenotazioni</span>
-      </a>
-      <a class="strumento" href="https://claude.ai/artifact/PmJxTN3rtozD6d6UMtfqZK" target="_blank" rel="noopener">
-        <h3>Registro soci e tessere</h3>
-        <p>Anagrafica dei soci, quote annuali, abbinamento e blocco delle tessere NFC.</p>
-        <span class="accesso-con">Account Claude</span>
-      </a>
-      <a class="strumento" href="/tessera.html">
-        <h3>Verifica tessera</h3>
-        <p>Controlla se una tessera è valida. Si apre anche avvicinando la tessera al telefono.</p>
-        <span class="accesso-con">Accesso libero</span>
-      </a>
-    </div>
-
-    <h2>Servizi collegati</h2>
-    <div class="strumenti">
-      <a class="strumento" href="https://me.sumup.com" target="_blank" rel="noopener">
-        <h3>SumUp</h3>
-        <p>Incassi con il POS, movimenti e accrediti sul conto dell'associazione.</p>
-        <span class="accesso-con">Account SumUp</span>
-      </a>
-      <a class="strumento" href="https://github.com/pfaravel-arch/sito-castello" target="_blank" rel="noopener">
-        <h3>Sito (GitHub)</h3>
-        <p>Testi, pagine ed eventi del sito; ogni modifica va online da sola.</p>
-        <span class="accesso-con">Account GitHub</span>
-      </a>
-      <a class="strumento" href="https://dash.cloudflare.com/ad04d13f98ce302688c0333656fd583a/workers/services/view/castello-prenotazioni/production" target="_blank" rel="noopener">
-        <h3>Motore prenotazioni (Cloudflare)</h3>
-        <p>Stato del servizio che riceve le prenotazioni e del suo database.</p>
-        <span class="accesso-con">Account Cloudflare</span>
-      </a>
-      <a class="strumento" href="https://admin.aruba.it" target="_blank" rel="noopener">
-        <h3>Dominio (Aruba)</h3>
-        <p>Rinnovo del dominio castellodisilvanopietra.com e impostazioni DNS.</p>
-        <span class="accesso-con">Area clienti Aruba</span>
-      </a>
+    <div id="area" aria-live="polite">
+      <form class="modulo accesso" id="area-accesso">
+        <label>Password<input type="password" name="p" autocomplete="current-password" required></label>
+        <p class="errore-modulo" role="alert" hidden></p>
+        <button class="bottone bottone-pieno" type="submit">Entra</button>
+      </form>
     </div>
   </div>
 </section>

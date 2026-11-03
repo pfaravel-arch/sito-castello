@@ -121,3 +121,17 @@ Sull'evento compare il pulsante "Prenota online". Le prenotazioni si gestiscono 
 `/gestione-prenotazioni.html` (pagina non indicizzata, protetta da password).
 
 Prova locale del motore: `node prenotazioni/test/prova.mjs`.
+
+## Area riservata
+
+`/area-riservata.html` (link nel piè di pagina) chiede una password. Il contenuto (elenco degli
+strumenti di gestione) non è nel repository in chiaro: sta cifrato in `data/area-riservata.json`
+e la pagina lo decifra nel browser con la password. Per modificarlo o cambiare password:
+
+```
+AREA_PASSWORD='password' python3 strumenti/cifra_area.py decifra > contenuto.html
+# modifica contenuto.html, poi:
+AREA_PASSWORD='password nuova o uguale' python3 strumenti/cifra_area.py cifra contenuto.html
+```
+
+Non salvare contenuto.html nel repository.
