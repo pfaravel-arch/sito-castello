@@ -6,6 +6,7 @@ Ogni pagina in src/pages/*.html inizia con un commento JSON:
 - "nav": testo nel menu (se manca, la pagina non compare nel menu)
 - "order": posizione nel menu
 - "scripts": (facoltativo) elenco di file JS extra da caricare
+- "robots": "noindex" per escludere la pagina dai motori di ricerca
 
 Uso:  python3 build.py
 Nessuna libreria esterna richiesta.
@@ -52,7 +53,8 @@ def main():
         for chiave, valore in {
             "title": p["title"], "description": p.get("description", ""),
             "slug": p["slug"], "nav": menu(pagine, p["file"]), "content": p["corpo"],
-            "scripts": script, "version": versione, "year": str(datetime.date.today().year),
+            "scripts": script, "version": versione,
+            "robots": '<meta name="robots" content="noindex, nofollow">' if p.get("robots") == "noindex" else "", "year": str(datetime.date.today().year),
         }.items():
             html = html.replace("{{" + chiave + "}}", valore)
         (DIST / p["file"]).write_text(html, encoding="utf-8")

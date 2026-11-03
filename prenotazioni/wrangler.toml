@@ -1,0 +1,19 @@
+# Motore delle prenotazioni del Castello di Silvano Pietra APS (Cloudflare Workers).
+# Si pubblica da solo con .github/workflows/prenotazioni.yml.
+# __D1_ID__ viene sostituito dalla pubblicazione con l'identificativo reale del database.
+name = "castello-prenotazioni"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# Da qui il motore legge gli eventi prenotabili (data/eventi.json del sito)
+SITO = "https://www.castellodisilvanopietra.com"
+# Siti che possono usare il motore
+ORIGINI = "https://www.castellodisilvanopietra.com,https://castellodisilvanopietra.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "castello-prenotazioni"
+database_id = "__D1_ID__"
+migrations_dir = "migrations"

@@ -91,3 +91,33 @@ GitHub Pages non ha quell'indirizzo, quindi risponde con `404.html`, che rimanda
 esporta il gestionale soci e lancia `strumenti/genera_tessere.py`. Per ogni tessera contiene l'impronta SHA-256 del codice
 e la scheda (numero, nome, stato, fine validità) cifrata in AES-GCM con una chiave ricavata dal
 codice: solo chi ha la tessera può leggere la propria scheda. Il file non contiene mai i codici.
+
+## Prenotazioni online
+
+Il motore delle prenotazioni sta in `prenotazioni/` e gira su Cloudflare Workers (gratuito),
+con le prenotazioni salvate in un database Cloudflare D1. Si pubblica da solo con
+`.github/workflows/prenotazioni.yml` quando ci sono i secrets `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID` e `PRENOTAZIONI_PASSWORD`.
+
+L'indirizzo del motore va scritto in `data/prenotazioni.json` (`"api": "https://...workers.dev"`).
+
+Per rendere prenotabile un evento, in `data/eventi.json` aggiungi:
+
+```json
+"prenotazioni": {
+  "id": "mercatini-2026",
+  "fasce": { "dalle": "15:00", "alle": "18:30", "ogni": 30 },
+  "posti": 15,
+  "max_per_prenotazione": 10,
+  "chiusura": "2026-12-07T12:00"
+}
+```
+
+- `id`: nome breve dell'evento, solo lettere minuscole, numeri e trattini; non cambiarlo dopo le prime prenotazioni.
+- `fasce`: orari di partenza; in alternativa un elenco `["17:00","17:30"]`. Senza `fasce` c'è un'unica prenotazione per l'evento.
+- `posti`: posti per ogni fascia. `chiusura` (facoltativa): ora italiana in cui chiudono le prenotazioni.
+
+Sull'evento compare il pulsante "Prenota online". Le prenotazioni si gestiscono in
+`/gestione-prenotazioni.html` (pagina non indicizzata, protetta da password).
+
+Prova locale del motore: `node prenotazioni/test/prova.mjs`.

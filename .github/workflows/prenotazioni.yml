@@ -1,0 +1,78 @@
+# Pubblica il motore delle prenotazioni su Cloudflare Workers.
+# Secrets richiesti (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN    chiave Cloudflare con permessi Workers Scripts: Edit e D1: Edit
+#   CLOUDFLARE_ACCOUNT_ID   identificativo dell'account Cloudflare
+#   PRENOTAZIONI_PASSWORD   password della pagina riservata /gestione-prenotazioni.html
+name: Pubblica il motore delle prenotazioni
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prenotazioni/**"
+      - ".github/workflows/prenotazioni.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: prenotazioni
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: prenotazioni
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PRENOTAZIONI_PASSWORD: ${{ secrets.PRENOTAZIONI_PASSWORD }}
+      DB_NOME: castello-prenotazioni
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Prove del motore
+        run: node test/prova.mjs
+
+      - name: Controlla le chiavi Cloudflare
+        id: chiavi
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::Chiavi Cloudflare non ancora inserite: pubblicazione saltata."
+            echo "ok=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=si" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Crea il database se non esiste
+        if: steps.chiavi.outputs.ok == 'si'
+        run: |
+          trova() { npx --yes wrangler@4 d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s);const x=l.find(d=>d.name===process.env.DB_NOME);process.stdout.write(x?x.uuid:"")})'; }
+          ID=$(trova)
+          if [ -z "$ID" ]; then
+            npx --yes wrangler@4 d1 create "$DB_NOME" --location weur
+            ID=$(trova)
+          fi
+          test -n "$ID"
+          sed -i "s/__D1_ID__/$ID/" wrangler.toml
+          echo "Database: $ID"
+
+      - name: Aggiorna la struttura del database
+        if: steps.chiavi.outputs.ok == 'si'
+        run: npx --yes wrangler@4 d1 migrations apply "$DB_NOME" --remote
+
+      - name: Pubblica il motore
+        if: steps.chiavi.outputs.ok == 'si'
+        run: |
+          npx --yes wrangler@4 deploy | tee deploy.log
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "### Motore delle prenotazioni pubblicato" >> "$GITHUB_STEP_SUMMARY"
+          echo "Indirizzo: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Imposta la password dell'area riservata
+        if: steps.chiavi.outputs.ok == 'si' && env.PRENOTAZIONI_PASSWORD != ''
+        run: printf '%s' "$PRENOTAZIONI_PASSWORD" | npx --yes wrangler@4 secret put ADMIN_PASSWORD

@@ -156,3 +156,56 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .esito-attesa{border-left:6px solid var(--ocra)}
 .esito-attesa .esito-stato{color:#7A5E28}
 .verifica-staff{font-size:.9rem;margin-inline:auto}
+
+/* Prenotazione online */
+.prenotazione{max-width:48rem}
+.dettagli-evento{color:var(--terraverde-scuro);font-style:italic;margin-bottom:.4rem}
+.modulo{margin-top:1.5rem}
+.modulo label{display:flex;flex-direction:column;gap:.35rem;font-size:.95rem}
+.modulo input,.modulo select,.modulo textarea{font:inherit;font-size:1rem;padding:.7rem .8rem;border:1px solid var(--linea);background:#fff;color:var(--carbone);border-radius:2px;width:100%}
+.modulo input:focus,.modulo select:focus,.modulo textarea:focus{outline:2px solid var(--ocra);outline-offset:1px;border-color:var(--ocra)}
+.campi{display:grid;grid-template-columns:1fr 1fr;gap:1rem 1.2rem;margin:1.6rem 0 1rem}
+@media (max-width:600px){.campi{grid-template-columns:1fr}}
+.modulo .lungo{margin-bottom:1rem}
+.turni{border:0;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(7.5rem,1fr));gap:.6rem}
+.turni legend{font-family:var(--serif-titoli);font-size:1.3rem;margin-bottom:.8rem;padding:0}
+.modulo .turno{flex-direction:column;align-items:flex-start;gap:.1rem;border:1px solid var(--linea);background:#fff;padding:.7rem .8rem;cursor:pointer;position:relative}
+.turno input{position:absolute;opacity:0;pointer-events:none}
+.turno .ora{font-family:var(--serif-titoli);font-size:1.35rem;line-height:1}
+.turno .posti{font-size:.85rem;color:var(--carbone-tenue)}
+.turno:has(input:checked){border-color:var(--terraverde);box-shadow:inset 0 0 0 2px var(--terraverde);background:#F1F4F2}
+.turno:has(input:focus-visible){outline:2px solid var(--ocra);outline-offset:2px}
+.turno.piena{opacity:.5;cursor:not-allowed;background:transparent}
+.modulo .consenso{flex-direction:row;align-items:flex-start;gap:.6rem;margin:.4rem 0 1.2rem}
+.modulo .consenso input{width:auto;margin-top:.3rem}
+.modulo .nascosto{position:absolute;left:-9999px}
+.errore-modulo{color:#8A3328;border-left:4px solid #9B3A2E;padding:.4rem .8rem;background:#F7EDEB}
+.avviso-modulo{font-size:1.1rem}
+.nota-modulo{font-size:.9rem;color:var(--carbone-tenue);margin-top:1rem}
+.conferma .codice{font-family:var(--serif-titoli);font-size:clamp(2.4rem,9vw,3.6rem);letter-spacing:.18em;color:var(--terraverde-scuro);margin:.2rem 0 1.2rem}
+
+/* Area riservata prenotazioni */
+.gestione{max-width:84rem}
+.accesso{max-width:22rem}
+.accesso .bottone{margin-top:1rem}
+.gestione-testa{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;justify-content:space-between;margin-bottom:1rem}
+.gestione-testa select{font:inherit;padding:.5rem;border:1px solid var(--linea);margin-left:.4rem;max-width:100%}
+.gestione-azioni{display:flex;flex-wrap:wrap;gap:.5rem}
+.gestione-azioni .bottone{padding:.6rem 1rem}
+.riepilogo{font-size:1.05rem}
+.riepilogo.chiedi{color:#8A3328;font-weight:600}
+.gruppo{margin-top:2rem}
+.gruppo h2{font-size:1.5rem;border-bottom:1px solid var(--linea);padding-bottom:.4rem}
+.gruppo h2 small{font-family:var(--serif-testo);font-size:1rem;color:var(--carbone-tenue)}
+.tabella-scorre{overflow-x:auto}
+.tabella{width:100%;border-collapse:collapse;font-size:.95rem}
+.tabella th{text-align:left;font-weight:600;font-size:.85rem;color:var(--carbone-tenue);padding:.5rem;border-bottom:1px solid var(--linea)}
+.tabella td{padding:.55rem .5rem;border-bottom:1px solid var(--linea);vertical-align:top}
+.tabella .cod{font-family:var(--serif-titoli);letter-spacing:.08em}
+.tabella tr.annullata td{text-decoration:line-through;color:#9A9EA1}
+.tabella tr.annullata td:last-child{text-decoration:none}
+.tabella input[type=checkbox]{width:1.2rem;height:1.2rem}
+.link-azione,.link-esci{font:inherit;background:none;border:0;padding:0;color:var(--terraverde-scuro);text-decoration:underline;cursor:pointer}
+.gestione-esci{margin-top:2.5rem}
+.vuoto{color:var(--carbone-tenue);font-style:italic}
+@media print{.testata,.piede,.gestione-testa,.gestione-esci,.tabella td:last-child,.tabella th:last-child{display:none}.fascia{padding:0}}

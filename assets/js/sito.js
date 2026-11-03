@@ -17,7 +17,10 @@
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function scheda(e){
     var d=new Date(e.data+'T12:00:00');
-    var link=e.link?'<a class="bottone" href="'+esc(e.link)+'">'+esc(e.etichetta_link||'Scopri di più')+'</a>':'';
+    var oggiJs=new Date(); oggiJs.setHours(0,0,0,0);
+    var prenotabile=e.prenotazioni&&e.prenotazioni.id&&new Date((e.fine||e.data)+'T23:59:59')>=oggiJs;
+    var link=(prenotabile?'<a class="bottone bottone-pieno" href="/prenota.html?evento='+encodeURIComponent(e.prenotazioni.id)+'">Prenota online</a> ':'')+
+      (e.link?'<a class="bottone" href="'+esc(e.link)+'">'+esc(e.etichetta_link||'Scopri di più')+'</a>':'');
     var loc=e.locandina?'<a class="evento-locandina" href="'+esc(e.locandina)+'" target="_blank" rel="noopener"><img src="'+esc(e.locandina)+'" alt="Locandina: '+esc(e.titolo)+'" loading="lazy"></a>':'';
     return '<article class="evento'+(loc?' con-locandina':'')+'"><div class="evento-data"><span class="giorno">'+d.getDate()+'</span><span class="mese">'+MESI[d.getMonth()]+' '+d.getFullYear()+'</span></div>'+
       '<div><h3>'+esc(e.titolo)+'</h3>'+
