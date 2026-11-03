@@ -59,7 +59,7 @@
             '<td>'+(r.telefono?'<a href="tel:'+esc(r.telefono)+'">'+esc(r.telefono)+'</a><br>':'')+(r.email?'<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>':'')+'</td>'+
             '<td>'+(r.socio==='richiesta'?'Chiede adesione':esc(r.tessera||'Socio'))+'</td><td>'+esc(r.note||'')+'</td>'+
             '<td><input type="checkbox" class="pagato" data-c="'+esc(r.codice)+'"'+(r.pagato?' checked':'')+(ann?' disabled':'')+' aria-label="Pagato"></td>'+
-            '<td><button type="button" class="link-azione stato" data-c="'+esc(r.codice)+'" data-s="'+(ann?'confermata':'annullata')+'">'+(ann?'Ripristina':'Annulla')+'</button></td></tr>';
+            '<td>'+(ann?'<span class="nota-annullo">'+(r.annullata_da==='partecipante'?'Annullata dal partecipante':'Annullata')+'</span><br>':'')+'<button type="button" class="link-azione stato" data-c="'+esc(r.codice)+'" data-s="'+(ann?'confermata':'annullata')+'">'+(ann?'Ripristina':'Annulla')+'</button></td></tr>';
         }).join('')+'</tbody></table></div></section>';
     });
     box.innerHTML=h+esci(); legaEsci();
@@ -91,7 +91,7 @@
   function scarica(){
     var col=['Codice','Fascia','Cognome','Nome','Persone','Telefono','E-mail','Tessera','Note','Stato','Pagato','Creata'];
     var q=function(v){v=String(v==null?'':v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-    var rows=righe.map(function(r){return [r.codice,r.fascia,r.cognome,r.nome,r.persone,r.telefono,r.email,r.socio==='richiesta'?'Chiede adesione':(r.tessera||'Socio'),r.note,r.stato,r.pagato?'Sì':'No',r.creata].map(q).join(';');});
+    var rows=righe.map(function(r){return [r.codice,r.fascia,r.cognome,r.nome,r.persone,r.telefono,r.email,r.socio==='richiesta'?'Chiede adesione':(r.tessera||'Socio'),r.note,r.stato+(r.annullata_da==='partecipante'?' dal partecipante':''),r.pagato?'Sì':'No',r.creata].map(q).join(';');});
     var blob=new Blob(['﻿'+col.join(';')+'\n'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='prenotazioni-'+corrente.id+'.csv';document.body.appendChild(a);a.click();a.remove();
   }

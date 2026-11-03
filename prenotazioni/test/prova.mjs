@@ -140,6 +140,26 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.match(conf.subject, new RegExp(r.dati.codice)); assert.match(conf.textContent, /2026-007/); assert.match(conf.textContent, /partenza alle 16:00/);
   assert.match(conf.htmlContent, /Prenotazione confermata/);
   assert.match(email.find((e) => e.to[0].email === "castellodisilvanopietra@gmail.com").subject, /Nuova prenotazione/);
+
+  // annullamento dal link nell'e-mail: libera i posti e avvisa
+  const link = conf.textContent.match(/https:\/\/\S+\/annulla\.html\?c=([A-Z0-9]{6})&k=([a-z0-9]+)/);
+  assert.ok(link, "link di annullamento nell'e-mail"); assert.match(conf.htmlContent, /Annulla la prenotazione/);
+  const [, cod, k] = link;
+  assert.equal((await chiama("GET", `/prenotazioni/${cod}?k=sbagliata`)).status, 404);
+  r = await chiama("GET", `/prenotazioni/${cod}?k=${k}`);
+  assert.equal(r.status, 200); assert.equal(r.dati.annullabile, true); assert.equal(r.dati.persone, 2); assert.equal(r.dati.fascia, "16:00");
+  const liberiPrima = (await chiama("GET", "/eventi/" + id)).dati.fasce.find((f) => f.ora === "16:00").liberi;
+  email.length = 0;
+  assert.equal((await chiama("POST", `/prenotazioni/${cod}/annulla`, { k: "no" })).status, 404);
+  r = await chiama("POST", `/prenotazioni/${cod}/annulla`, { k });
+  assert.equal(r.status, 200); assert.equal(r.dati.stato, "annullata");
+  assert.equal((await chiama("GET", "/eventi/" + id)).dati.fasce.find((f) => f.ora === "16:00").liberi, liberiPrima + 2, "posti liberati");
+  await Promise.all(attese);
+  assert.ok(email.some((e) => e.to[0].email === "mario@example.com" && /^Prenotazione annullata/.test(e.subject)));
+  assert.ok(email.some((e) => e.to[0].email === "castellodisilvanopietra@gmail.com" && /^Annullata:/.test(e.subject)));
+  r = await chiama("POST", `/prenotazioni/${cod}/annulla`, { k }); assert.equal(r.dati.gia, true, "doppio clic innocuo");
+  assert.equal((await chiama("GET", `/prenotazioni/${cod}?k=${k}`)).dati.annullabile, false);
+  email.length = 0;
   email.length = 0;
   r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "", telefono: "333 1112223", socio: "richiesta", tessera: "2026-001" });
   assert.equal(r.status, 201); assert.equal(r.dati.email_conferma, false);
@@ -152,7 +172,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // area riservata prenotazioni
   r = await chiama("GET", "/admin/eventi?prenotabili=1", null, A);
-  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 20); assert.equal(r.dati[0].aperte, true);
+  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 18); assert.equal(r.dati[0].aperte, true);
   assert.equal((await chiama("GET", "/admin/eventi", null, A)).dati.length, 2);
   const elenco = (await chiama("GET", "/admin/prenotazioni?evento=" + id, null, A)).dati;
   assert.equal(elenco.length, 6); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);

@@ -127,3 +127,11 @@ Gmail del Castello via SMTP (`smtp.gmail.com:465`, `prenotazioni/src/smtp.js`) q
 e copia si impostano in `wrangler.toml`. In alternativa, senza `SMTP_PASSWORD`, si può usare Brevo con il
 secret `BREVO_API_KEY`. Se la password per le app viene revocata, le prenotazioni continuano a
 funzionare ma le e-mail non partono.
+
+### Annullamento da parte del partecipante
+
+Ogni e-mail di conferma contiene un link personale `/annulla.html?c=CODICE&k=CHIAVE` (chiave casuale
+salvata con la prenotazione). La pagina mostra il riepilogo e chiede conferma; l'annullamento libera
+subito i posti e invia "Prenotazione annullata" al partecipante e "Annullata: …" all'associazione.
+Funziona finché le prenotazioni dell'evento sono aperte. In Gestione prenotazioni compare
+"Annullata dal partecipante".

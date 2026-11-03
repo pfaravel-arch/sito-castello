@@ -6,6 +6,8 @@
 //   GET  /locandine/:id          immagine della locandina
 //   GET  /eventi/:id             fasce orarie e posti liberi di un evento prenotabile
 //   POST /prenotazioni           crea una prenotazione (controlla i posti in modo atomico)
+//   GET  /prenotazioni/:codice?k=CHIAVE          riepilogo per la pagina di annullamento
+//   POST /prenotazioni/:codice/annulla {k}       annulla dal link nell'e-mail e libera i posti
 // Riservato (intestazione "X-Password" = segreto ADMIN_PASSWORD):
 //   GET    /admin/eventi[?prenotabili=1]     eventi con i totali delle prenotazioni
 //   GET    /admin/eventi/:id                 scheda completa di un evento
@@ -57,6 +59,8 @@ async function instrada(request, env, ctx) {
   if (m === "GET" && (r = p.match(/^\/locandine\/([a-z0-9-]{1,60})$/))) return locandina(env, r[1]);
   if (m === "GET" && (r = p.match(/^\/eventi\/([a-z0-9-]{1,60})$/))) return disponibilita(env, r[1], await eAdmin(request, env));
   if (m === "POST" && p === "/prenotazioni") return prenota(env, await leggiJson(request), ctx, await eAdmin(request, env));
+  if (m === "GET" && (r = p.match(/^\/prenotazioni\/([A-Z0-9]{6})$/))) return datiPerAnnullo(env, r[1], url.searchParams.get("k"));
+  if (m === "POST" && (r = p.match(/^\/prenotazioni\/([A-Z0-9]{6})\/annulla$/))) return annullaDalPartecipante(env, r[1], (await leggiJson(request)).k, ctx);
 
   if (p.startsWith("/admin/")) {
     await controllaPassword(request, env);
@@ -361,16 +365,17 @@ async function prenota(env, d, ctx, admin) {
   if (d.consenso !== true) throw new Errore("Per prenotare serve il consenso al trattamento dei dati.");
   const note = testo(d.note, 300);
 
+  const chiave = nuovaChiave();
   for (let tentativo = 0; tentativo < 3; tentativo++) {
     const codice = nuovoCodice();
     try {
       // Inserisce solo se c'è ancora posto: controllo e scrittura in un'unica istruzione
       const res = await env.DB.prepare(
-        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, chiave_annullo)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE (SELECT COALESCE(SUM(persone),0) FROM prenotazioni
                 WHERE evento = ? AND fascia = ? AND stato != 'annullata') + ? <= ?`
-      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null,
+      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null, chiave,
              ev.id, fascia, persone, posti).run();
       if (!res.meta || res.meta.changes !== 1) {
         const liberi = Math.max(0, posti - ((await occupati(env, ev.id))[fascia] || 0));
@@ -378,7 +383,7 @@ async function prenota(env, d, ctx, admin) {
           ? `In questa fascia restano solo ${liberi} posti: riduci il numero di persone o scegli un altro orario.`
           : "Questa fascia oraria è appena stata completata: scegline un'altra.", 409);
       }
-      const p = { codice, nome, cognome, email, telefono, persone, fascia, socio, tessera, note };
+      const p = { codice, chiave, nome, cognome, email, telefono, persone, fascia, socio, tessera, note };
       const conferma = !!(email && emailAttiva(env));
       if (emailAttiva(env)) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
       return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, email_conferma: conferma }, 201);
@@ -388,6 +393,12 @@ async function prenota(env, d, ctx, admin) {
     }
   }
   throw new Errore("Errore temporaneo, riprova.", 503);
+}
+
+function nuovaChiave() {
+  const b = new Uint8Array(15);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => "abcdefghijkmnpqrstuvwxyz23456789"[x % 32]).join("");
 }
 
 function nuovoCodice() {
@@ -403,7 +414,11 @@ const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "ve
 export function dataEstesa(d) { const x = new Date(d + "T12:00:00Z"); return `${GIORNI[x.getUTCDay()]} ${x.getUTCDate()} ${MESI[x.getUTCMonth()]} ${x.getUTCFullYear()}`; }
 const h = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-export function testoEmail(ev, p) {
+export function linkAnnullo(env, p) {
+  return `${env.SITO || "https://www.castellodisilvanopietra.com"}/annulla.html?c=${p.codice}&k=${p.chiave}`;
+}
+
+export function testoEmail(ev, p, link) {
   const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : ev.orario ? `, ${ev.orario}` : "");
   const righe = [
     ["Evento", ev.titolo], ["Quando", quando], ["Dove", ev.luogo || "Castello di Silvano Pietra"],
@@ -415,7 +430,8 @@ export function testoEmail(ev, p) {
     righe.map(([k, v]) => `${k}: ${v}`).join("\n") +
     (ev.avviso ? `\n\n${ev.avviso}` : "") +
     `\n\nMostra questo codice all'arrivo. Ti chiediamo di arrivare con 15-30 minuti di anticipo.\n` +
-    `Per modificare o annullare la prenotazione rispondi a questa e-mail indicando il codice.\n\nA presto al Castello!\nCastello di Silvano Pietra APS\nPiazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)\nwww.castellodisilvanopietra.com`;
+    (link ? `Se non puoi più venire, annulla la prenotazione da qui (i posti tornano disponibili per altri):\n${link}\n` : "") +
+    `Per domande o modifiche rispondi a questa e-mail.\n\nA presto al Castello!\nCastello di Silvano Pietra APS\nPiazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)\nwww.castellodisilvanopietra.com`;
   const html = `<!doctype html><html lang="it"><body style="margin:0;background:#E8E6E3;font-family:Georgia,serif;color:#2F3336">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F3F2F0;border:1px solid #CBC7C1">
@@ -429,7 +445,9 @@ ${righe.map(([k, v]) => `<tr><td style="padding:8px 12px 8px 0;color:#5B6064;bor
 </table>
 ${ev.avviso ? `<p style="font-style:italic;font-size:15px;line-height:1.6;margin:18px 0 0">${h(ev.avviso)}</p>` : ""}
 <p style="font-size:15px;line-height:1.6;margin:18px 0 0">Mostra questo codice all'arrivo. Ti chiediamo di arrivare con 15-30 minuti di anticipo.</p>
-<p style="font-size:15px;line-height:1.6;margin:12px 0 0">Per modificare o annullare la prenotazione <strong>rispondi a questa e-mail</strong> indicando il codice.</p>
+${link ? `<p style="font-size:15px;line-height:1.6;margin:18px 0 8px">Se non puoi più venire, annulla la prenotazione: i posti tornano disponibili per altri.</p>
+<p style="margin:0"><a href="${h(link)}" style="display:inline-block;padding:10px 18px;border:1px solid #2F3336;color:#2F3336;text-decoration:none;font-size:15px">Annulla la prenotazione</a></p>` : ""}
+<p style="font-size:15px;line-height:1.6;margin:16px 0 0">Per domande o modifiche <strong>rispondi a questa e-mail</strong>.</p>
 </td></tr>
 <tr><td style="padding:24px 28px 28px;font-size:13px;line-height:1.6;color:#5B6064">Castello di Silvano Pietra APS<br>Piazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)<br><a href="https://www.castellodisilvanopietra.com" style="color:#3D5449">www.castellodisilvanopietra.com</a></td></tr>
 </table></td></tr></table></body></html>`;
@@ -466,7 +484,7 @@ async function inviaBrevo(env, a, nomeA, oggetto, testo, html) {
 }
 
 async function inviaEmailPrenotazione(env, ev, p) {
-  const m = testoEmail(ev, p);
+  const m = testoEmail(ev, p, p.chiave ? linkAnnullo(env, p) : null);
   const invii = [];
   if (p.email) invii.push(invia(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
   if (env.EMAIL_COPIA) {
@@ -476,6 +494,65 @@ async function inviaEmailPrenotazione(env, ev, p) {
       `Tessera: ${p.socio === "richiesta" ? "chiede di aderire" : p.tessera || "socio, numero non indicato"}\n` + (p.note ? `Note: ${p.note}\n` : "") +
       `\nCodice ${p.codice}. Elenco completo: https://www.castellodisilvanopietra.com/gestione-prenotazioni.html`));
   }
+  await Promise.all(invii);
+}
+
+// ---------- annullamento dal link nell'e-mail ----------
+
+async function prenotazioneConChiave(env, codice, k) {
+  const r = await env.DB.prepare("SELECT * FROM prenotazioni WHERE codice = ?").bind(codice).first();
+  if (!r || !r.chiave_annullo || typeof k !== "string" || k !== r.chiave_annullo) throw new Errore("Link non valido. Controlla di aver aperto il link completo dall'e-mail.", 404);
+  return r;
+}
+
+async function annullabile(env, r) {
+  const ev = await eventoPrenotabile(env, r.evento, true).catch(() => null);
+  return { ev, puo: r.stato === "confermata" && !!ev && prenotazioniAperte(ev) };
+}
+
+async function datiPerAnnullo(env, codice, k) {
+  const r = await prenotazioneConChiave(env, codice, k);
+  const { ev, puo } = await annullabile(env, r);
+  return json({ codice, nome: r.nome, persone: r.persone, fascia: r.fascia, stato: r.stato, annullabile: puo,
+    titolo: ev ? ev.titolo : "", data: ev ? ev.data : "", orario: ev ? ev.orario : "", luogo: ev ? ev.luogo : "" });
+}
+
+async function annullaDalPartecipante(env, codice, k, ctx) {
+  const r = await prenotazioneConChiave(env, codice, k);
+  if (r.stato === "annullata") return json({ codice, stato: "annullata", gia: true });
+  const { ev, puo } = await annullabile(env, r);
+  if (!puo) throw new Errore("Non è più possibile annullare online: scrivici e ti aiutiamo.", 409);
+  const res = await env.DB.prepare("UPDATE prenotazioni SET stato = 'annullata', annullata_da = 'partecipante', aggiornata = datetime('now') WHERE codice = ? AND stato = 'confermata'").bind(codice).run();
+  if (res.meta && res.meta.changes === 1 && emailAttiva(env)) ctx.waitUntil(inviaEmailAnnullo(env, ev, r).catch((e) => console.error("e-mail", e)));
+  return json({ codice, stato: "annullata" });
+}
+
+export function testoEmailAnnullo(ev, p) {
+  const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : "");
+  const oggetto = `Prenotazione annullata: ${ev.titolo} (codice ${p.codice})`;
+  const testo = `Ciao ${p.nome},\n\nabbiamo annullato la tua prenotazione ${p.codice} per ${ev.titolo}, ${quando}, ${p.persone} ${p.persone === 1 ? "persona" : "persone"}.\n` +
+    `I posti sono di nuovo disponibili per altri. Se cambi idea puoi prenotare di nuovo dal sito, finché ci sono posti.\n\n` +
+    `Grazie di averci avvisato.\nCastello di Silvano Pietra APS\nwww.castellodisilvanopietra.com`;
+  const html = `<!doctype html><html lang="it"><body style="margin:0;background:#E8E6E3;font-family:Georgia,serif;color:#2F3336">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F3F2F0;border:1px solid #CBC7C1">
+<tr><td style="padding:28px 28px 8px;text-align:center"><img src="https://www.castellodisilvanopietra.com/assets/img/logo.png" width="200" alt="Castello di Silvano Pietra APS" style="width:200px;height:auto"></td></tr>
+<tr><td style="padding:8px 28px 28px"><h1 style="font-weight:normal;font-size:26px;margin:16px 0 8px">Prenotazione annullata</h1>
+<p style="font-size:16px;line-height:1.6;margin:0 0 12px">Ciao ${h(p.nome)}, abbiamo annullato la prenotazione <strong>${h(p.codice)}</strong> per <strong>${h(ev.titolo)}</strong>, ${h(quando)}, ${p.persone} ${p.persone === 1 ? "persona" : "persone"}.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">I posti sono di nuovo disponibili per altri. Se cambi idea puoi prenotare di nuovo dal sito, finché ci sono posti.</p>
+<p style="font-size:15px;line-height:1.6;margin:0">Grazie di averci avvisato.</p>
+<p style="font-size:13px;line-height:1.6;color:#5B6064;margin:24px 0 0">Castello di Silvano Pietra APS<br><a href="https://www.castellodisilvanopietra.com" style="color:#3D5449">www.castellodisilvanopietra.com</a></p>
+</td></tr></table></td></tr></table></body></html>`;
+  return { oggetto, testo, html };
+}
+
+async function inviaEmailAnnullo(env, ev, p) {
+  const m = testoEmailAnnullo(ev, p);
+  const invii = [];
+  if (p.email) invii.push(invia(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
+  if (env.EMAIL_COPIA) invii.push(invia(env, env.EMAIL_COPIA, "",
+    `Annullata: ${ev.titolo}, ${p.fascia !== "unica" ? "ore " + p.fascia + ", " : ""}${p.persone} pers. (${p.codice})`,
+    `${p.cognome} ${p.nome} ha annullato la prenotazione ${p.codice} (${p.persone} ${p.persone === 1 ? "persona" : "persone"}). I posti sono tornati disponibili.\n\nElenco: https://www.castellodisilvanopietra.com/gestione-prenotazioni.html`));
   await Promise.all(invii);
 }
 
@@ -528,7 +605,7 @@ async function adminEventi(env, soloPrenotabili) {
 async function adminElenco(env, evento) {
   if (!evento) throw new Errore("Indica l'evento.");
   const { results } = await env.DB.prepare(
-    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, pagato, creata FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
+    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, annullata_da, pagato, creata FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
   ).bind(evento).all();
   return json(results.map((r) => ({ ...r, pagato: !!r.pagato })));
 }
@@ -536,7 +613,7 @@ async function adminElenco(env, evento) {
 async function adminAggiorna(env, codice, d) {
   const campi = [], valori = [];
   if (typeof d.pagato === "boolean") { campi.push("pagato = ?"); valori.push(d.pagato ? 1 : 0); }
-  if (d.stato === "confermata" || d.stato === "annullata") { campi.push("stato = ?"); valori.push(d.stato); }
+  if (d.stato === "confermata" || d.stato === "annullata") { campi.push("stato = ?", "annullata_da = ?"); valori.push(d.stato, d.stato === "annullata" ? "staff" : null); }
   if (!campi.length) throw new Errore("Niente da aggiornare.");
   const res = await env.DB.prepare(`UPDATE prenotazioni SET ${campi.join(", ")}, aggiornata = datetime('now') WHERE codice = ?`)
     .bind(...valori, codice).run();

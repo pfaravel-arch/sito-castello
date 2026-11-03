@@ -281,3 +281,4 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .pren-dettagli[hidden],.modo-orari[hidden],.modo-elenco[hidden]{display:none}
 .campo-tessera[hidden]{display:none}
 .avviso-prova{border-left:4px solid var(--ocra);background:#F6EFDF;padding:.6rem .9rem;color:#5E4A1F}
+.nota-annullo{font-size:.85rem;color:#8A3328;text-decoration:none!important}

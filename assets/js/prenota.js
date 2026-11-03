@@ -72,7 +72,7 @@
         box.innerHTML='<div class="conferma"><p class="dettagli-evento">'+esc(dataLunga(r.data))+'</p><h1>Prenotazione confermata</h1>'+
           '<p class="introduzione">'+esc(r.titolo)+(r.fascia!=='unica'?', partenza alle '+esc(r.fascia):'')+', '+r.persone+(r.persone===1?' persona':' persone')+'.</p>'+
           '<p>Il tuo codice di prenotazione è</p><p class="codice">'+esc(r.codice)+'</p>'+
-          (r.email_conferma?'<p>Ti abbiamo inviato una e-mail di conferma con tutti i dettagli: se non la trovi, controlla nello spam.</p>':'')+
+          (r.email_conferma?'<p>Ti abbiamo inviato una e-mail di conferma con tutti i dettagli: se non la trovi, controlla nello spam. Se non potrai più venire, nell\'e-mail trovi il link per annullare.</p>':'')+
           '<p>Annotalo o fai uno screenshot di questa pagina e mostralo all\'arrivo. Arriva con 15-30 minuti di anticipo rispetto all\'orario prenotato.</p>'+
           '<p>Per modificare o annullare scrivi a <a href="mailto:castellodisilvanopietra@gmail.com?subject=Prenotazione%20'+esc(r.codice)+'">castellodisilvanopietra@gmail.com</a> indicando il codice.</p></div>';
         window.scrollTo(0,box.offsetTop-20);
