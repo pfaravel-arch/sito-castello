@@ -279,3 +279,4 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .modulo input[type=file]{padding:.5rem;background:#fff}
 @media (max-width:560px){.locandina-campo{grid-template-columns:1fr}.anteprima{max-width:10rem}}
 .pren-dettagli[hidden],.modo-orari[hidden],.modo-elenco[hidden]{display:none}
+.campo-tessera[hidden]{display:none}

@@ -43,6 +43,7 @@
         '<label>Telefono<input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>'+
         '<label>Numero di persone<input name="persone" type="number" min="1" max="'+ev.max_per_prenotazione+'" value="1" required></label>'+
         '<label>Sei socio dell\'associazione?<select name="socio"><option value="si">Sì, sono già socio</option><option value="richiesta">No, chiedo di aderire</option></select></label>'+
+        '<label class="campo-tessera">Numero di tessera <span class="facoltativo">(facoltativo, es. 2026-001)</span><input name="tessera" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="2026-001"></label>'+
       '</div>'+
       '<label class="lungo">Note (facoltative)<textarea name="note" rows="2" maxlength="300"></textarea></label>'+
       '<label class="nascosto" aria-hidden="true">Sito web<input name="sito_web" tabindex="-1" autocomplete="off"></label>'+
@@ -53,11 +54,13 @@
     '</form>';
     box.innerHTML=h;
     var form=box.querySelector('form'), err=box.querySelector('.errore-modulo'), btn=form.querySelector('button');
+    var campoTessera=form.querySelector('.campo-tessera');
+    form.socio.onchange=function(){campoTessera.hidden=this.value!=='si';if(campoTessera.hidden)form.tessera.value='';};
     form.addEventListener('submit',function(e){
       e.preventDefault(); err.hidden=true;
       var f=new FormData(form);
       var dati={evento:id,fascia:f.get('fascia')||'',nome:f.get('nome'),cognome:f.get('cognome'),email:f.get('email'),telefono:f.get('telefono'),
-        persone:Number(f.get('persone')),socio:f.get('socio'),note:f.get('note'),sito_web:f.get('sito_web'),consenso:form.consenso.checked};
+        persone:Number(f.get('persone')),socio:f.get('socio'),tessera:f.get('tessera'),note:f.get('note'),sito_web:f.get('sito_web'),consenso:form.consenso.checked};
       var problema=!dati.fascia?'Scegli un orario.':!dati.nome||!dati.cognome?'Inserisci nome e cognome.':
         !dati.email&&!dati.telefono?'Lascia almeno un\'e-mail o un numero di telefono.':!dati.consenso?'Serve il consenso al trattamento dei dati.':'';
       if(problema){err.textContent=problema;err.hidden=false;return;}
@@ -66,6 +69,7 @@
         box.innerHTML='<div class="conferma"><p class="dettagli-evento">'+esc(dataLunga(r.data))+'</p><h1>Prenotazione confermata</h1>'+
           '<p class="introduzione">'+esc(r.titolo)+(r.fascia!=='unica'?', partenza alle '+esc(r.fascia):'')+', '+r.persone+(r.persone===1?' persona':' persone')+'.</p>'+
           '<p>Il tuo codice di prenotazione è</p><p class="codice">'+esc(r.codice)+'</p>'+
+          (r.email_conferma?'<p>Ti abbiamo inviato una e-mail di conferma con tutti i dettagli: se non la trovi, controlla nello spam.</p>':'')+
           '<p>Annotalo o fai uno screenshot di questa pagina e mostralo all\'arrivo. Arriva con 15-30 minuti di anticipo rispetto all\'orario prenotato.</p>'+
           '<p>Per modificare o annullare scrivi a <a href="mailto:castellodisilvanopietra@gmail.com?subject=Prenotazione%20'+esc(r.codice)+'">castellodisilvanopietra@gmail.com</a> indicando il codice.</p></div>';
         window.scrollTo(0,box.offsetTop-20);

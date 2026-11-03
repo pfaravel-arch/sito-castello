@@ -15,7 +15,12 @@
       return crypto.subtle.decrypt({name:'AES-GCM',iv:b64(d.iv)},x[1],b64(d.dati));
     }).then(function(chiaro){
       box.innerHTML=new TextDecoder().decode(chiaro)+'<p class="gestione-esci"><button type="button" class="link-esci">Esci</button></p>';
-      box.querySelector('.link-esci').onclick=function(){salva('');location.reload();};
+      // codice di accesso per le pagine interne (gestione eventi, prenotazioni): nessuna altra password
+      var t=box.querySelector('meta[name=area-token]');
+      if(t){try{sessionStorage.setItem('gp',t.content);}catch(e){} t.remove();}
+      box.querySelector('.link-esci').onclick=function(){salva('');try{sessionStorage.removeItem('gp');}catch(e){}location.href='/area-riservata.html';};
+      var torna=new URLSearchParams(location.search).get('torna');
+      if(torna&&/^\/[a-z0-9-]+\.html$/.test(torna)) location.replace(torna);
     });
   }
   function deriva(password){

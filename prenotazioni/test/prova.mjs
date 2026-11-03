@@ -3,7 +3,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
-import worker, { fasceDi, prenotazioniAperte, slug } from "../src/index.js";
+import { createHash } from "node:crypto";
+import worker, { fasceDi, prenotazioniAperte, slug, dataEstesa } from "../src/index.js";
 
 export function creaD1() {
   const db = new DatabaseSync(":memory:");
@@ -31,21 +32,28 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const ARCHIVIO = [
     { titolo: "Delirium al Castello", data: "2026-10-31", descrizione: "Horror tour", locandina: "/assets/img/eventi/d.jpg" },
   ];
-  globalThis.fetch = async (u) => {
+  const email = [];
+  globalThis.fetch = async (u, o) => {
     const s = String(u);
+    if (s.startsWith("https://api.brevo.com/")) { email.push({ key: o.headers["api-key"], ...JSON.parse(o.body) }); return new Response("{}", { status: 201 }); }
     if (s.endsWith("/data/eventi.json")) return new Response(JSON.stringify(ARCHIVIO));
     if (s.endsWith("/d.jpg")) return new Response(PNG, { headers: { "Content-Type": "image/jpeg" } });
     return new Response("no", { status: 404 });
   };
 
-  const env = { DB: creaD1(), SITO: "https://sito", ORIGINI: "https://www.castellodisilvanopietra.com", ADMIN_PASSWORD: "segreta" };
+  const TOKEN = "codice-area-di-prova";
+  const env = { DB: creaD1(), SITO: "https://sito", ORIGINI: "https://www.castellodisilvanopietra.com", ADMIN_PASSWORD: "segreta",
+    AREA_TOKEN_SHA256: createHash("sha256").update(TOKEN).digest("hex"), BREVO_API_KEY: "chiave-prova",
+    EMAIL_MITTENTE: "prenotazioni@castellodisilvanopietra.com", EMAIL_RISPOSTA: "castellodisilvanopietra@gmail.com", EMAIL_COPIA: "castellodisilvanopietra@gmail.com" };
+  const attese = [];
+  const ctx = { waitUntil: (p) => attese.push(p) };
   const A = { "X-Password": "segreta" };
   const chiama = async (metodo, path, body, headers = {}) => {
     const isBin = body instanceof Uint8Array;
     const res = await worker.fetch(new Request("https://w" + path, {
       method: metodo, body: body == null ? undefined : isBin ? body : JSON.stringify(body),
       headers: { "Content-Type": isBin ? "image/png" : "application/json", Origin: "https://www.castellodisilvanopietra.com", ...headers },
-    }), env);
+    }), env, ctx);
     const ct = res.headers.get("Content-Type") || "";
     return { status: res.status, dati: ct.includes("json") ? await res.json() : new Uint8Array(await res.arrayBuffer()), h: res.headers };
   };
@@ -106,11 +114,35 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const [a, b] = await Promise.all([chiama("POST", "/prenotazioni", { ...base, persone: 1 }), chiama("POST", "/prenotazioni", { ...base, persone: 1 })]);
   assert.deepEqual([a.status, b.status].sort(), [201, 409]);
 
+  // numero di tessera ed e-mail di conferma
+  email.length = 0;
+  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 2, tessera: "n. 2026-7" });
+  assert.equal(r.status, 201, JSON.stringify(r.dati)); assert.equal(r.dati.email_conferma, true);
+  assert.equal((await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", tessera: "abc" })).status, 400);
+  await Promise.all(attese);
+  assert.equal(email.length, 2, "conferma + copia all'associazione");
+  const conf = email.find((e) => e.to[0].email === "mario@example.com");
+  assert.equal(conf.key, "chiave-prova"); assert.equal(conf.replyTo.email, "castellodisilvanopietra@gmail.com");
+  assert.match(conf.subject, new RegExp(r.dati.codice)); assert.match(conf.textContent, /2026-007/); assert.match(conf.textContent, /partenza alle 16:00/);
+  assert.match(conf.htmlContent, /Prenotazione confermata/);
+  assert.match(email.find((e) => e.to[0].email === "castellodisilvanopietra@gmail.com").subject, /Nuova prenotazione/);
+  email.length = 0;
+  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "", telefono: "333 1112223", socio: "richiesta", tessera: "2026-001" });
+  assert.equal(r.status, 201); assert.equal(r.dati.email_conferma, false);
+  await Promise.all(attese); assert.equal(email.length, 1, "solo copia all'associazione se manca l'e-mail");
+  assert.match(dataEstesa("2026-12-08"), /^martedì 8 dicembre 2026$/);
+
+  // accesso con il codice dell'area riservata
+  assert.equal((await chiama("GET", "/admin/eventi", null, { "X-Password": TOKEN })).status, 200);
+  assert.equal((await chiama("GET", "/admin/eventi", null, { "X-Password": TOKEN + "x" })).status, 401);
+
   // area riservata prenotazioni
   r = await chiama("GET", "/admin/eventi?prenotabili=1", null, A);
-  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 15); assert.equal(r.dati[0].aperte, true);
+  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 18); assert.equal(r.dati[0].aperte, true);
   assert.equal((await chiama("GET", "/admin/eventi", null, A)).dati.length, 2);
-  assert.equal((await chiama("GET", "/admin/prenotazioni?evento=" + id, null, A)).dati.length, 3);
+  const elenco = (await chiama("GET", "/admin/prenotazioni?evento=" + id, null, A)).dati;
+  assert.equal(elenco.length, 5); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
+  assert.equal(elenco.find((x) => x.socio === "richiesta").tessera, null, "chi chiede di aderire non ha tessera");
   assert.equal((await chiama("PATCH", "/admin/prenotazioni/" + codice, { stato: "annullata" }, A)).status, 200);
   assert.equal((await chiama("GET", "/eventi/" + id)).dati.fasce[0].liberi, 4);
 

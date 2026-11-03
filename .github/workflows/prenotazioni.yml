@@ -2,7 +2,8 @@
 # Secrets richiesti (Settings > Secrets and variables > Actions):
 #   CLOUDFLARE_API_TOKEN    chiave Cloudflare con permessi Workers Scripts: Edit e D1: Edit
 #   CLOUDFLARE_ACCOUNT_ID   identificativo dell'account Cloudflare
-#   PRENOTAZIONI_PASSWORD   password della pagina riservata /gestione-prenotazioni.html
+#   PRENOTAZIONI_PASSWORD   password di riserva per le pagine di gestione (di solito si entra dall'area riservata)
+#   BREVO_API_KEY           (facoltativo) chiave Brevo per le e-mail di conferma delle prenotazioni
 name: Pubblica il motore delle prenotazioni
 
 on:
@@ -27,6 +28,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PRENOTAZIONI_PASSWORD: ${{ secrets.PRENOTAZIONI_PASSWORD }}
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
       DB_NOME: castello-prenotazioni
     steps:
       - uses: actions/checkout@v4
@@ -76,3 +78,7 @@ jobs:
       - name: Imposta la password dell'area riservata
         if: steps.chiavi.outputs.ok == 'si' && env.PRENOTAZIONI_PASSWORD != ''
         run: printf '%s' "$PRENOTAZIONI_PASSWORD" | npx --yes wrangler@4 secret put ADMIN_PASSWORD
+
+      - name: Imposta la chiave per le e-mail di conferma
+        if: steps.chiavi.outputs.ok == 'si' && env.BREVO_API_KEY != ''
+        run: printf '%s' "$BREVO_API_KEY" | npx --yes wrangler@4 secret put BREVO_API_KEY

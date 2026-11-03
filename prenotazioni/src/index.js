@@ -25,11 +25,11 @@ const TIPI_IMMAGINE = ["image/jpeg", "image/png", "image/webp"];
 const MAX_LOCANDINA = 1_800_000;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cors = intestazioniCors(request, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     try {
-      const risposta = await instrada(request, env);
+      const risposta = await instrada(request, env, ctx || { waitUntil: (p) => p.catch(() => {}) });
       for (const [k, v] of Object.entries(cors)) risposta.headers.set(k, v);
       return risposta;
     } catch (e) {
@@ -44,7 +44,7 @@ class Errore extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
 
-async function instrada(request, env) {
+async function instrada(request, env, ctx) {
   const url = new URL(request.url);
   const p = url.pathname.replace(/\/+$/, "") || "/";
   const m = request.method;
@@ -54,7 +54,7 @@ async function instrada(request, env) {
   if (m === "GET" && p === "/calendario") return calendario(env, url);
   if (m === "GET" && (r = p.match(/^\/locandine\/([a-z0-9-]{1,60})$/))) return locandina(env, r[1]);
   if (m === "GET" && (r = p.match(/^\/eventi\/([a-z0-9-]{1,60})$/))) return disponibilita(env, r[1]);
-  if (m === "POST" && p === "/prenotazioni") return prenota(env, await leggiJson(request));
+  if (m === "POST" && p === "/prenotazioni") return prenota(env, await leggiJson(request), ctx);
 
   if (p.startsWith("/admin/")) {
     await controllaPassword(request, env);
@@ -327,7 +327,7 @@ async function disponibilita(env, id) {
   });
 }
 
-async function prenota(env, d) {
+async function prenota(env, d, ctx) {
   if (d.sito_web) throw new Errore("Richiesta non valida."); // campo esca per i robot
   const ev = await eventoPrenotabile(env, testo(d.evento, 60));
   if (!prenotazioniAperte(ev)) throw new Errore("Le prenotazioni per questo evento sono chiuse.", 409);
@@ -346,6 +346,13 @@ async function prenota(env, d) {
   const persone = Number.parseInt(d.persone, 10);
   if (!Number.isInteger(persone) || persone < 1 || persone > maxPer) throw new Errore(`Il numero di persone deve essere tra 1 e ${maxPer}.`);
   const socio = d.socio === "richiesta" ? "richiesta" : "si";
+  let tessera = null;
+  if (socio === "si" && testo(d.tessera, 20)) {
+    const t = testo(d.tessera, 20).toUpperCase().replace(/^N\.?\s*/, "").replace(/\s+/g, "");
+    const m = t.match(/^(\d{4})[-/.]?(\d{1,4})$/);
+    if (!m) throw new Errore("Il numero di tessera non sembra corretto: scrivilo come sulla tessera, per esempio 2026-001.");
+    tessera = `${m[1]}-${m[2].padStart(3, "0")}`;
+  }
   if (d.consenso !== true) throw new Errore("Per prenotare serve il consenso al trattamento dei dati.");
   const note = testo(d.note, 300);
 
@@ -354,11 +361,11 @@ async function prenota(env, d) {
     try {
       // Inserisce solo se c'è ancora posto: controllo e scrittura in un'unica istruzione
       const res = await env.DB.prepare(
-        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, note)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE (SELECT COALESCE(SUM(persone),0) FROM prenotazioni
                 WHERE evento = ? AND fascia = ? AND stato != 'annullata') + ? <= ?`
-      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, note || null,
+      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null,
              ev.id, fascia, persone, posti).run();
       if (!res.meta || res.meta.changes !== 1) {
         const liberi = Math.max(0, posti - ((await occupati(env, ev.id))[fascia] || 0));
@@ -366,7 +373,10 @@ async function prenota(env, d) {
           ? `In questa fascia restano solo ${liberi} posti: riduci il numero di persone o scegli un altro orario.`
           : "Questa fascia oraria è appena stata completata: scegline un'altra.", 409);
       }
-      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone }, 201);
+      const p = { codice, nome, cognome, email, telefono, persone, fascia, socio, tessera, note };
+      const conferma = !!(email && env.BREVO_API_KEY);
+      if (env.BREVO_API_KEY) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
+      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, email_conferma: conferma }, 201);
     } catch (e) {
       if (e instanceof Errore) throw e;
       if (!/UNIQUE/i.test(String(e && e.message))) throw e; // codice già usato: ne genera un altro
@@ -381,18 +391,90 @@ function nuovoCodice() {
   return Array.from(b, (x) => ALFABETO[x % ALFABETO.length]).join("");
 }
 
+// ---------- e-mail di conferma (Brevo) ----------
+
+const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+export function dataEstesa(d) { const x = new Date(d + "T12:00:00Z"); return `${GIORNI[x.getUTCDay()]} ${x.getUTCDate()} ${MESI[x.getUTCMonth()]} ${x.getUTCFullYear()}`; }
+const h = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+export function testoEmail(ev, p) {
+  const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : ev.orario ? `, ${ev.orario}` : "");
+  const righe = [
+    ["Evento", ev.titolo], ["Quando", quando], ["Dove", ev.luogo || "Castello di Silvano Pietra"],
+    ["Persone", String(p.persone)], ["Nome", `${p.nome} ${p.cognome}`],
+    ["Tessera", p.socio === "richiesta" ? "chiede di aderire all'associazione" : p.tessera || "socio"],
+  ];
+  const oggetto = `Prenotazione confermata: ${ev.titolo} (codice ${p.codice})`;
+  const testo = `Ciao ${p.nome},\n\nla tua prenotazione è confermata.\n\nCodice di prenotazione: ${p.codice}\n\n` +
+    righe.map(([k, v]) => `${k}: ${v}`).join("\n") +
+    (ev.avviso ? `\n\n${ev.avviso}` : "") +
+    `\n\nMostra questo codice all'arrivo. Ti chiediamo di arrivare con 15-30 minuti di anticipo.\n` +
+    `Per modificare o annullare la prenotazione rispondi a questa e-mail indicando il codice.\n\nA presto al Castello!\nCastello di Silvano Pietra APS\nPiazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)\nwww.castellodisilvanopietra.com`;
+  const html = `<!doctype html><html lang="it"><body style="margin:0;background:#E8E6E3;font-family:Georgia,serif;color:#2F3336">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F3F2F0;border:1px solid #CBC7C1">
+<tr><td style="padding:28px 28px 8px;text-align:center"><img src="https://www.castellodisilvanopietra.com/assets/img/logo.png" width="200" alt="Castello di Silvano Pietra APS" style="width:200px;height:auto"></td></tr>
+<tr><td style="padding:8px 28px 0"><h1 style="font-weight:normal;font-size:26px;margin:16px 0 8px">Prenotazione confermata</h1>
+<p style="font-size:16px;line-height:1.6;margin:0 0 16px">Ciao ${h(p.nome)}, ti aspettiamo al Castello.</p>
+<p style="margin:0 0 4px;font-size:14px;color:#5B6064">Il tuo codice di prenotazione</p>
+<p style="font-size:34px;letter-spacing:6px;margin:0 0 20px;color:#3D5449">${h(p.codice)}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:1.5;border-top:1px solid #CBC7C1">
+${righe.map(([k, v]) => `<tr><td style="padding:8px 12px 8px 0;color:#5B6064;border-bottom:1px solid #CBC7C1;width:90px;vertical-align:top">${h(k)}</td><td style="padding:8px 0;border-bottom:1px solid #CBC7C1">${h(v)}</td></tr>`).join("")}
+</table>
+${ev.avviso ? `<p style="font-style:italic;font-size:15px;line-height:1.6;margin:18px 0 0">${h(ev.avviso)}</p>` : ""}
+<p style="font-size:15px;line-height:1.6;margin:18px 0 0">Mostra questo codice all'arrivo. Ti chiediamo di arrivare con 15-30 minuti di anticipo.</p>
+<p style="font-size:15px;line-height:1.6;margin:12px 0 0">Per modificare o annullare la prenotazione <strong>rispondi a questa e-mail</strong> indicando il codice.</p>
+</td></tr>
+<tr><td style="padding:24px 28px 28px;font-size:13px;line-height:1.6;color:#5B6064">Castello di Silvano Pietra APS<br>Piazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)<br><a href="https://www.castellodisilvanopietra.com" style="color:#3D5449">www.castellodisilvanopietra.com</a></td></tr>
+</table></td></tr></table></body></html>`;
+  return { oggetto, testo, html };
+}
+
+async function inviaBrevo(env, a, nomeA, oggetto, testo, html) {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": env.BREVO_API_KEY, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      sender: { email: env.EMAIL_MITTENTE, name: env.EMAIL_NOME || "Castello di Silvano Pietra APS" },
+      to: [{ email: a, name: nomeA || undefined }],
+      replyTo: { email: env.EMAIL_RISPOSTA || env.EMAIL_MITTENTE },
+      subject: oggetto, textContent: testo, ...(html ? { htmlContent: html } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`Brevo ${res.status}: ${await res.text()}`);
+}
+
+async function inviaEmailPrenotazione(env, ev, p) {
+  const m = testoEmail(ev, p);
+  const invii = [];
+  if (p.email) invii.push(inviaBrevo(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
+  if (env.EMAIL_COPIA) {
+    const contatti = [p.email, p.telefono].filter(Boolean).join(" · ");
+    invii.push(inviaBrevo(env, env.EMAIL_COPIA, "", `Nuova prenotazione: ${ev.titolo}, ${p.fascia !== "unica" ? "ore " + p.fascia + ", " : ""}${p.persone} pers. (${p.codice})`,
+      `${p.cognome} ${p.nome}, ${p.persone} persone\n${contatti}\n` +
+      `Tessera: ${p.socio === "richiesta" ? "chiede di aderire" : p.tessera || "socio, numero non indicato"}\n` + (p.note ? `Note: ${p.note}\n` : "") +
+      `\nCodice ${p.codice}. Elenco completo: https://www.castellodisilvanopietra.com/gestione-prenotazioni.html`));
+  }
+  await Promise.all(invii);
+}
+
 // ---------- area riservata ----------
 
+// Accesso con la password ADMIN_PASSWORD oppure con il codice custodito nell'area riservata del sito
 async function controllaPassword(request, env) {
   const data = request.headers.get("X-Password") || "";
-  const attesa = env.ADMIN_PASSWORD || "";
-  if (!attesa) throw new Errore("Area riservata non ancora configurata.", 503);
+  if (!env.ADMIN_PASSWORD && !env.AREA_TOKEN_SHA256) throw new Errore("Area riservata non ancora configurata.", 503);
   const enc = new TextEncoder();
-  const [a, b] = await Promise.all([data, attesa].map((s) => crypto.subtle.digest("SHA-256", enc.encode(s))));
-  const x = new Uint8Array(a), y = new Uint8Array(b);
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
-  if (diff !== 0) throw new Errore("Password non corretta.", 401);
+  const impronta = async (s) => new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s)));
+  const uguali = (x, y) => { let diff = x.length ^ y.length; for (let i = 0; i < Math.min(x.length, y.length); i++) diff |= x[i] ^ y[i]; return diff === 0; };
+  const hData = await impronta(data);
+  if (env.ADMIN_PASSWORD && uguali(hData, await impronta(env.ADMIN_PASSWORD))) return;
+  if (env.AREA_TOKEN_SHA256) {
+    const atteso = Uint8Array.from(String(env.AREA_TOKEN_SHA256).match(/../g) || [], (h) => parseInt(h, 16));
+    if (uguali(hData, atteso)) return;
+  }
+  throw new Errore("Accesso non valido: entra dall'area riservata.", 401);
 }
 
 async function adminEventi(env, soloPrenotabili) {
@@ -421,7 +503,7 @@ async function adminEventi(env, soloPrenotabili) {
 async function adminElenco(env, evento) {
   if (!evento) throw new Errore("Indica l'evento.");
   const { results } = await env.DB.prepare(
-    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, note, stato, pagato, creata FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
+    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, pagato, creata FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
   ).bind(evento).all();
   return json(results.map((r) => ({ ...r, pagato: !!r.pagato })));
 }

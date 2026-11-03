@@ -4,7 +4,7 @@ import http from "node:http";
 import worker from "../src/index.js";
 import { creaD1 } from "./prova.mjs";
 const SITO = process.argv[2] || "http://localhost:8765";
-const env = { DB: creaD1(), SITO, ORIGINI: "http://localhost:8765", ADMIN_PASSWORD: "prova" };
+const env = { DB: creaD1(), SITO, ORIGINI: "http://localhost:8765", ADMIN_PASSWORD: "prova", AREA_TOKEN_SHA256: process.env.AREA_TOKEN_SHA256 || "" };
 http.createServer(async (req, res) => {
   const chunks = []; for await (const c of req) chunks.push(c);
   const body = Buffer.concat(chunks);

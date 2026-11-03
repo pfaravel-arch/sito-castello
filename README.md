@@ -113,3 +113,15 @@ AREA_PASSWORD='password nuova o uguale' python3 strumenti/cifra_area.py cifra co
 ```
 
 Non salvare contenuto.html nel repository.
+
+### Accesso unico ed e-mail di conferma
+
+Chi entra nell'area riservata riceve (dal contenuto cifrato) un codice che il motore riconosce
+tramite la sua impronta `AREA_TOKEN_SHA256` in `prenotazioni/wrangler.toml`: le pagine Gestione
+eventi e Gestione prenotazioni non chiedono altre password e, se aperte senza accesso, rimandano
+all'area riservata. "Esci" nell'area riservata chiude l'accesso.
+
+Le e-mail di conferma delle prenotazioni partono con Brevo quando c'è il secret `BREVO_API_KEY`
+(GitHub → Actions). Mittente, risposta e copia all'associazione si impostano in `wrangler.toml`
+(`EMAIL_MITTENTE`, `EMAIL_RISPOSTA`, `EMAIL_COPIA`). Il dominio del mittente va autenticato su Brevo
+(record DNS su Aruba).

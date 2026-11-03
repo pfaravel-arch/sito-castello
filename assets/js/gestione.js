@@ -17,11 +17,9 @@
     PWD=leggi('gp'); PWD?carica():accesso();
   });
 
-  function accesso(msg){
-    box.innerHTML='<form class="modulo accesso"><label>Password<input type="password" name="p" autocomplete="current-password" required></label>'+
-      (msg?'<p class="errore-modulo" role="alert">'+esc(msg)+'</p>':'')+'<button class="bottone bottone-pieno">Entra</button></form>';
-    box.querySelector('form').addEventListener('submit',function(e){e.preventDefault();PWD=this.p.value;carica();});
-    box.querySelector('input').focus();
+  function accesso(){ // l'accesso si fa dall'area riservata, che poi riporta qui
+    try{sessionStorage.removeItem('gp');}catch(e){}
+    location.replace('/area-riservata.html?torna='+encodeURIComponent(location.pathname));
   }
 
   function carica(){
@@ -30,11 +28,11 @@
       if(!l.length){box.innerHTML='<p>Nessun evento prenotabile. Aggiungi un evento con prenotazioni nel calendario.</p>'+esci();legaEsci();return;}
       var sel=leggi('ge'); corrente=l.find(function(e){return e.id===sel;})||l.filter(function(e){return e.aperte;})[0]||l[0];
       elenco();
-    }).catch(function(e){salva('gp','');PWD='';accesso(e.status===401?'Password non corretta.':e.message);});
+    }).catch(function(e){salva('gp','');PWD='';e.status===401?accesso():box.innerHTML='<p class="errore-modulo">'+esc(e.message)+'</p>';});
   }
 
-  function esci(){return '<p class="gestione-esci"><button type="button" class="link-esci">Esci</button></p>';}
-  function legaEsci(){var b=box.querySelector('.link-esci');if(b)b.onclick=function(){salva('gp','');PWD='';accesso();};}
+  function esci(){return '<p class="gestione-esci"><button type="button" class="link-esci">Torna all\'area riservata</button></p>';}
+  function legaEsci(){var b=box.querySelector('.link-esci');if(b)b.onclick=function(){location.href='/area-riservata.html';};}
 
   function elenco(){
     salva('ge',corrente.id);
@@ -54,12 +52,12 @@
       var qui=righe.filter(function(r){return r.fascia===f;}); var occ=qui.filter(function(r){return r.stato!=='annullata';}).reduce(function(s,r){return s+r.persone;},0);
       h+='<section class="gruppo"><h2>'+(f==='unica'?'Prenotazioni':'Ore '+esc(f))+' <small>'+occ+' / '+corrente.posti_per_fascia+'</small></h2>';
       if(!qui.length){h+='<p class="vuoto">Nessuna prenotazione.</p></section>';return;}
-      h+='<div class="tabella-scorre"><table class="tabella"><thead><tr><th>Codice</th><th>Nome</th><th>Persone</th><th>Contatti</th><th>Socio</th><th>Note</th><th>Pagato</th><th></th></tr></thead><tbody>'+
+      h+='<div class="tabella-scorre"><table class="tabella"><thead><tr><th>Codice</th><th>Nome</th><th>Persone</th><th>Contatti</th><th>Tessera</th><th>Note</th><th>Pagato</th><th></th></tr></thead><tbody>'+
         qui.map(function(r){
           var ann=r.stato==='annullata';
           return '<tr class="'+(ann?'annullata':'')+'"><td class="cod">'+esc(r.codice)+'</td><td>'+esc(r.cognome+' '+r.nome)+'</td><td>'+r.persone+'</td>'+
             '<td>'+(r.telefono?'<a href="tel:'+esc(r.telefono)+'">'+esc(r.telefono)+'</a><br>':'')+(r.email?'<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>':'')+'</td>'+
-            '<td>'+(r.socio==='richiesta'?'Chiede adesione':'Sì')+'</td><td>'+esc(r.note||'')+'</td>'+
+            '<td>'+(r.socio==='richiesta'?'Chiede adesione':esc(r.tessera||'Socio'))+'</td><td>'+esc(r.note||'')+'</td>'+
             '<td><input type="checkbox" class="pagato" data-c="'+esc(r.codice)+'"'+(r.pagato?' checked':'')+(ann?' disabled':'')+' aria-label="Pagato"></td>'+
             '<td><button type="button" class="link-azione stato" data-c="'+esc(r.codice)+'" data-s="'+(ann?'confermata':'annullata')+'">'+(ann?'Ripristina':'Annulla')+'</button></td></tr>';
         }).join('')+'</tbody></table></div></section>';
@@ -91,9 +89,9 @@
   function alertaErrore(e){var p=box.querySelector('.riepilogo');p.classList.add('chiedi');p.textContent='Errore: '+e.message;}
 
   function scarica(){
-    var col=['Codice','Fascia','Cognome','Nome','Persone','Telefono','E-mail','Socio','Note','Stato','Pagato','Creata'];
+    var col=['Codice','Fascia','Cognome','Nome','Persone','Telefono','E-mail','Tessera','Note','Stato','Pagato','Creata'];
     var q=function(v){v=String(v==null?'':v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-    var rows=righe.map(function(r){return [r.codice,r.fascia,r.cognome,r.nome,r.persone,r.telefono,r.email,r.socio==='richiesta'?'Chiede adesione':'Sì',r.note,r.stato,r.pagato?'Sì':'No',r.creata].map(q).join(';');});
+    var rows=righe.map(function(r){return [r.codice,r.fascia,r.cognome,r.nome,r.persone,r.telefono,r.email,r.socio==='richiesta'?'Chiede adesione':(r.tessera||'Socio'),r.note,r.stato,r.pagato?'Sì':'No',r.creata].map(q).join(';');});
     var blob=new Blob(['﻿'+col.join(';')+'\n'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='prenotazioni-'+corrente.id+'.csv';document.body.appendChild(a);a.click();a.remove();
   }

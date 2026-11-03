@@ -23,17 +23,15 @@
     PWD=leggi('gp'); PWD?elenco():accesso();
   });
 
-  function accesso(msg){
-    box.innerHTML='<form class="modulo accesso"><label>Password<input type="password" name="p" autocomplete="current-password" required></label>'+
-      (msg?'<p class="errore-modulo" role="alert">'+esc(msg)+'</p>':'')+'<button class="bottone bottone-pieno">Entra</button></form>';
-    box.querySelector('form').addEventListener('submit',function(e){e.preventDefault();PWD=this.p.value;elenco();});
-    box.querySelector('input').focus();
+  function accesso(){ // l'accesso si fa dall'area riservata, che poi riporta qui
+    try{sessionStorage.removeItem('gp');}catch(e){}
+    location.replace('/area-riservata.html?torna='+encodeURIComponent(location.pathname));
   }
 
   // ---------- elenco ----------
   function elenco(){
     chiamata('GET','/admin/eventi').then(function(l){salva('gp',PWD);eventi=l;disegnaElenco();})
-      .catch(function(e){if(e.status===401){salva('gp','');PWD='';accesso('Password non corretta.');}else box.innerHTML='<p class="errore-modulo">'+esc(e.message)+'</p>';});
+      .catch(function(e){if(e.status===401){salva('gp','');PWD='';accesso();}else box.innerHTML='<p class="errore-modulo">'+esc(e.message)+'</p>';});
   }
   function etichette(e){
     var t=[];
@@ -62,9 +60,9 @@
       gruppo('In programma sul sito',futuri,'Nessun evento pubblicato in programma.')+
       gruppo('Bozze',bozze,'Nessuna bozza. Le bozze sono visibili solo qui.')+
       gruppo('Passati e chiusi',vecchi,'Nessun evento passato.')+
-      '<p class="gestione-esci"><button type="button" class="link-esci">Esci</button></p>';
+      '<p class="gestione-esci"><button type="button" class="link-esci">Torna all\'area riservata</button></p>';
     avviso='';
-    box.querySelector('.link-esci').onclick=function(){salva('gp','');PWD='';accesso();};
+    box.querySelector('.link-esci').onclick=function(){location.href='/area-riservata.html';};
     box.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){
       var a=b.dataset.a, id=b.dataset.id;
       if(a==='nuovo') return editor(null);
