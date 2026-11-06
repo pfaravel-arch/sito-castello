@@ -1,13 +1,13 @@
 /* Castello di Silvano Pietra APS — foglio di stile
    Colori presi dai materiali del castello: intonaco a calce, carbone del logo,
-   terra verde degli affreschi, ocra dorata, notte per gli eventi serali. */
+   blu di guado (il colorante storico della pianta del guado), ocra dorata, notte per gli eventi serali. */
 :root{
   --intonaco:#E8E6E3;
   --intonaco-chiaro:#F3F2F0;
   --carbone:#2F3336;
   --carbone-tenue:#5B6064;
-  --terraverde:#4F6B5E;
-  --terraverde-scuro:#3D5449;
+  --guado:#3A5A85;
+  --guado-scuro:#2A4366;
   --ocra:#A8823A;
   --notte:#1A1F24;
   --linea:#CBC7C1;
@@ -21,7 +21,7 @@ html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
 body{margin:0;background:var(--intonaco);color:var(--carbone);font:400 1.0625rem/1.7 var(--serif-testo);text-rendering:optimizeLegibility}
 img{max-width:100%;height:auto;display:block}
-a{color:var(--terraverde-scuro);text-underline-offset:.18em;text-decoration-thickness:1px}
+a{color:var(--guado-scuro);text-underline-offset:.18em;text-decoration-thickness:1px}
 a:hover{color:var(--carbone)}
 :focus-visible{outline:2px solid var(--ocra);outline-offset:3px}
 h1,h2,h3{font-family:var(--serif-titoli);font-weight:400;line-height:1.15;margin:0 0 .6em;letter-spacing:.01em}
@@ -52,8 +52,8 @@ p{margin:0 0 1em;max-width:var(--misura)}
 .fascia{padding:clamp(3rem,8vw,6.5rem) clamp(1rem,5vw,4rem)}
 .fascia-stretta{max-width:76rem;margin:0 auto}
 .fascia-chiara{background:var(--intonaco-chiaro)}
-.fascia-verde{background:var(--terraverde);color:#F1F3EF}
-.fascia-verde a{color:#fff}
+.fascia-guado{background:var(--guado);color:#EEF2F7}
+.fascia-guado a{color:#fff}
 .fascia-notte{background:var(--notte);color:#D9DCDF}
 .fascia-notte a{color:#E9D6A8}
 .introduzione{font-size:1.25rem;line-height:1.6;max-width:56ch}
@@ -62,7 +62,7 @@ p{margin:0 0 1em;max-width:var(--misura)}
 .hero{padding:clamp(3rem,8vw,6rem) clamp(1rem,5vw,4rem) clamp(3.5rem,8vw,6rem);text-align:center}
 .hero-testo{max-width:46rem;margin:0 auto}
 .hero h1{margin-bottom:.5em}
-.sopratitolo{font-style:italic;color:var(--terraverde-scuro);margin:0 auto 1.4rem;max-width:none}
+.sopratitolo{font-style:italic;color:var(--guado-scuro);margin:0 auto 1.4rem;max-width:none}
 .hero p{margin-left:auto;margin-right:auto}
 .hero .introduzione{font-size:clamp(1.2rem,2.2vw,1.45rem);color:var(--carbone);max-width:36ch;margin-bottom:1.6rem}
 .hero-racconto{color:var(--carbone-tenue);max-width:58ch}
@@ -70,8 +70,8 @@ p{margin:0 0 1em;max-width:var(--misura)}
 
 .bottone{display:inline-block;font:600 1rem/1 var(--serif-testo);text-decoration:none;padding:.95rem 1.4rem;border:1px solid var(--carbone);color:var(--carbone);background:transparent;border-radius:2px;cursor:pointer}
 .bottone:hover{background:var(--carbone);color:var(--intonaco)}
-.bottone-pieno{background:var(--terraverde);border-color:var(--terraverde);color:#fff}
-.bottone-pieno:hover{background:var(--terraverde-scuro);border-color:var(--terraverde-scuro);color:#fff}
+.bottone-pieno{background:var(--guado);border-color:var(--guado);color:#fff}
+.bottone-pieno:hover{background:var(--guado-scuro);border-color:var(--guado-scuro);color:#fff}
 .fascia-notte .bottone{border-color:#E9D6A8;color:#E9D6A8}
 .fascia-notte .bottone:hover{background:#E9D6A8;color:var(--notte)}
 
@@ -83,7 +83,7 @@ p{margin:0 0 1em;max-width:var(--misura)}
 .cronologia{list-style:none;margin:2rem 0 0;padding:0;border-left:2px solid var(--carbone);max-width:52rem}
 .cronologia li{position:relative;padding:0 0 2.2rem 2rem}
 .cronologia li::before{content:"";position:absolute;left:-7px;top:.55rem;width:12px;height:12px;background:var(--intonaco);border:2px solid var(--carbone)}
-.cronologia .anno{display:block;font-family:var(--serif-titoli);font-size:2rem;line-height:1;margin-bottom:.4rem;color:var(--terraverde-scuro)}
+.cronologia .anno{display:block;font-family:var(--serif-titoli);font-size:2rem;line-height:1;margin-bottom:.4rem;color:var(--guado-scuro)}
 .cronologia p{margin:0}
 
 /* Le tre torri: altezze reali in scala */
@@ -111,7 +111,7 @@ p{margin:0 0 1em;max-width:var(--misura)}
 /* Restauri: le opere */
 .opere{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:2.5rem;margin-top:2rem}
 .opera h3{border-bottom:1px solid var(--linea);padding-bottom:.6rem}
-.stato{display:inline-block;font-size:.85rem;padding:.15rem .6rem;border:1px solid var(--terraverde);color:var(--terraverde-scuro);border-radius:2px;margin-bottom:.6rem}
+.stato{display:inline-block;font-size:.85rem;padding:.15rem .6rem;border:1px solid var(--guado);color:var(--guado-scuro);border-radius:2px;margin-bottom:.6rem}
 
 /* Modi per sostenere */
 .sostegno{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:2rem;margin-top:2rem}
@@ -149,8 +149,8 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .esito-stato{font-family:var(--serif-titoli);font-size:1.9rem;letter-spacing:.06em;text-transform:uppercase;line-height:1.1;margin-bottom:.5rem!important}
 .esito-riga{font-size:1.1rem}
 .esito-nota{margin-top:.6rem!important;color:var(--carbone-tenue);font-size:.98rem}
-.esito-si{border-left:6px solid var(--terraverde)}
-.esito-si .esito-stato{color:var(--terraverde-scuro)}
+.esito-si{border-left:6px solid var(--guado)}
+.esito-si .esito-stato{color:var(--guado-scuro)}
 .esito-no{border-left:6px solid #9B3A2E}
 .esito-no .esito-stato{color:#8A3328}
 .esito-attesa{border-left:6px solid var(--ocra)}
@@ -159,7 +159,7 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 
 /* Prenotazione online */
 .prenotazione{max-width:48rem}
-.dettagli-evento{color:var(--terraverde-scuro);font-style:italic;margin-bottom:.4rem}
+.dettagli-evento{color:var(--guado-scuro);font-style:italic;margin-bottom:.4rem}
 .modulo{margin-top:1.5rem}
 .modulo label{display:flex;flex-direction:column;gap:.35rem;font-size:.95rem}
 .modulo input,.modulo select,.modulo textarea{font:inherit;font-size:1rem;padding:.7rem .8rem;border:1px solid var(--linea);background:#fff;color:var(--carbone);border-radius:2px;width:100%}
@@ -173,7 +173,7 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .turno input{position:absolute;opacity:0;pointer-events:none}
 .turno .ora{font-family:var(--serif-titoli);font-size:1.35rem;line-height:1}
 .turno .posti{font-size:.85rem;color:var(--carbone-tenue)}
-.turno:has(input:checked){border-color:var(--terraverde);box-shadow:inset 0 0 0 2px var(--terraverde);background:#F1F4F2}
+.turno:has(input:checked){border-color:var(--guado);box-shadow:inset 0 0 0 2px var(--guado);background:#EDF2F8}
 .turno:has(input:focus-visible){outline:2px solid var(--ocra);outline-offset:2px}
 .turno.piena{opacity:.5;cursor:not-allowed;background:transparent}
 .modulo .consenso{flex-direction:row;align-items:flex-start;gap:.6rem;margin:.4rem 0 1.2rem}
@@ -182,7 +182,7 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .errore-modulo{color:#8A3328;border-left:4px solid #9B3A2E;padding:.4rem .8rem;background:#F7EDEB}
 .avviso-modulo{font-size:1.1rem}
 .nota-modulo{font-size:.9rem;color:var(--carbone-tenue);margin-top:1rem}
-.conferma .codice{font-family:var(--serif-titoli);font-size:clamp(2.4rem,9vw,3.6rem);letter-spacing:.18em;color:var(--terraverde-scuro);margin:.2rem 0 1.2rem}
+.conferma .codice{font-family:var(--serif-titoli);font-size:clamp(2.4rem,9vw,3.6rem);letter-spacing:.18em;color:var(--guado-scuro);margin:.2rem 0 1.2rem}
 
 /* Area riservata prenotazioni */
 .gestione{max-width:84rem}
@@ -205,7 +205,7 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .tabella tr.annullata td{text-decoration:line-through;color:#9A9EA1}
 .tabella tr.annullata td:last-child{text-decoration:none}
 .tabella input[type=checkbox]{width:1.2rem;height:1.2rem}
-.link-azione,.link-esci{font:inherit;background:none;border:0;padding:0;color:var(--terraverde-scuro);text-decoration:underline;cursor:pointer}
+.link-azione,.link-esci{font:inherit;background:none;border:0;padding:0;color:var(--guado-scuro);text-decoration:underline;cursor:pointer}
 .gestione-esci{margin-top:2.5rem}
 .vuoto{color:var(--carbone-tenue);font-style:italic}
 @media print{.testata,.piede,.gestione-testa,.gestione-esci,.tabella td:last-child,.tabella th:last-child{display:none}.fascia{padding:0}}
@@ -215,11 +215,11 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .piede-fine .link-riservato{color:#C9CDD0}
 .area-riservata h2{margin-top:2.6rem}
 .strumenti{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:1rem;margin-top:1rem}
-.strumento{display:flex;flex-direction:column;text-decoration:none;color:var(--carbone);background:var(--intonaco-chiaro);border:1px solid var(--linea);border-left:4px solid var(--terraverde);padding:1.2rem 1.3rem}
-.strumento:hover{border-color:var(--terraverde);color:var(--carbone)}
+.strumento{display:flex;flex-direction:column;text-decoration:none;color:var(--carbone);background:var(--intonaco-chiaro);border:1px solid var(--linea);border-left:4px solid var(--guado);padding:1.2rem 1.3rem}
+.strumento:hover{border-color:var(--guado);color:var(--carbone)}
 .strumento h3{margin-bottom:.4rem}
 .strumento p{font-size:.95rem;color:var(--carbone-tenue);flex:1}
-.accesso-con{font-size:.85rem;color:var(--terraverde-scuro);font-style:italic}
+.accesso-con{font-size:.85rem;color:var(--guado-scuro);font-style:italic}
 
 /* Eventi: primo piano e archivio */
 [data-sezione][hidden]{display:none}
@@ -259,7 +259,7 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .stato-evidenza{border-color:#9B3A2E;color:#8A3328}
 .stato-pren{border-color:var(--carbone-tenue);color:var(--carbone)}
 .link-azione.attenzione{color:#8A3328;font-weight:600}
-.esito-ok{border-left:4px solid var(--terraverde);background:#EEF2EF;padding:.6rem .9rem}
+.esito-ok{border-left:4px solid var(--guado);background:#ECF1F7;padding:.6rem .9rem}
 .modulo-evento .blocco{border:1px solid var(--linea);padding:1rem 1.2rem 1.2rem;margin:1.6rem 0 0;background:var(--intonaco-chiaro)}
 .modulo-evento .blocco legend{font-family:var(--serif-titoli);font-size:1.25rem;padding:0 .4rem}
 .modulo-evento .campi .lungo{grid-column:1/-1}
@@ -268,7 +268,7 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .modulo .scelte{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.6rem;margin:.2rem 0 1rem}
 .modulo .scelta,.modulo .spunta{flex-direction:row;align-items:flex-start;gap:.6rem;cursor:pointer}
 .modulo .scelta{border:1px solid var(--linea);background:#fff;padding:.7rem .8rem}
-.modulo .scelta:has(input:checked){border-color:var(--terraverde);box-shadow:inset 0 0 0 1px var(--terraverde)}
+.modulo .scelta:has(input:checked){border-color:var(--guado);box-shadow:inset 0 0 0 1px var(--guado)}
 .modulo .scelta input,.modulo .spunta input{width:auto;margin-top:.25rem;flex:none}
 .modulo .scelta strong{display:block;font-weight:600}
 .modulo .scelta span{font-size:.9rem;color:var(--carbone-tenue)}

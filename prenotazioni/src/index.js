@@ -439,7 +439,7 @@ export function testoEmail(ev, p, link) {
 <tr><td style="padding:8px 28px 0"><h1 style="font-weight:normal;font-size:26px;margin:16px 0 8px">Prenotazione confermata</h1>
 <p style="font-size:16px;line-height:1.6;margin:0 0 16px">Ciao ${h(p.nome)}, ti aspettiamo al Castello.</p>
 <p style="margin:0 0 4px;font-size:14px;color:#5B6064">Il tuo codice di prenotazione</p>
-<p style="font-size:34px;letter-spacing:6px;margin:0 0 20px;color:#3D5449">${h(p.codice)}</p>
+<p style="font-size:34px;letter-spacing:6px;margin:0 0 20px;color:#2A4366">${h(p.codice)}</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:1.5;border-top:1px solid #CBC7C1">
 ${righe.map(([k, v]) => `<tr><td style="padding:8px 12px 8px 0;color:#5B6064;border-bottom:1px solid #CBC7C1;width:90px;vertical-align:top">${h(k)}</td><td style="padding:8px 0;border-bottom:1px solid #CBC7C1">${h(v)}</td></tr>`).join("")}
 </table>
@@ -449,7 +449,7 @@ ${link ? `<p style="font-size:15px;line-height:1.6;margin:18px 0 8px">Se non puo
 <p style="margin:0"><a href="${h(link)}" style="display:inline-block;padding:10px 18px;border:1px solid #2F3336;color:#2F3336;text-decoration:none;font-size:15px">Annulla la prenotazione</a></p>` : ""}
 <p style="font-size:15px;line-height:1.6;margin:16px 0 0">Per domande o modifiche <strong>rispondi a questa e-mail</strong>.</p>
 </td></tr>
-<tr><td style="padding:24px 28px 28px;font-size:13px;line-height:1.6;color:#5B6064">Castello di Silvano Pietra APS<br>Piazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)<br><a href="https://www.castellodisilvanopietra.com" style="color:#3D5449">www.castellodisilvanopietra.com</a></td></tr>
+<tr><td style="padding:24px 28px 28px;font-size:13px;line-height:1.6;color:#5B6064">Castello di Silvano Pietra APS<br>Piazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)<br><a href="https://www.castellodisilvanopietra.com" style="color:#2A4366">www.castellodisilvanopietra.com</a></td></tr>
 </table></td></tr></table></body></html>`;
   return { oggetto, testo, html };
 }
@@ -541,7 +541,7 @@ export function testoEmailAnnullo(ev, p) {
 <p style="font-size:16px;line-height:1.6;margin:0 0 12px">Ciao ${h(p.nome)}, abbiamo annullato la prenotazione <strong>${h(p.codice)}</strong> per <strong>${h(ev.titolo)}</strong>, ${h(quando)}, ${p.persone} ${p.persone === 1 ? "persona" : "persone"}.</p>
 <p style="font-size:15px;line-height:1.6;margin:0 0 12px">I posti sono di nuovo disponibili per altri. Se cambi idea puoi prenotare di nuovo dal sito, finché ci sono posti.</p>
 <p style="font-size:15px;line-height:1.6;margin:0">Grazie di averci avvisato.</p>
-<p style="font-size:13px;line-height:1.6;color:#5B6064;margin:24px 0 0">Castello di Silvano Pietra APS<br><a href="https://www.castellodisilvanopietra.com" style="color:#3D5449">www.castellodisilvanopietra.com</a></p>
+<p style="font-size:13px;line-height:1.6;color:#5B6064;margin:24px 0 0">Castello di Silvano Pietra APS<br><a href="https://www.castellodisilvanopietra.com" style="color:#2A4366">www.castellodisilvanopietra.com</a></p>
 </td></tr></table></td></tr></table></body></html>`;
   return { oggetto, testo, html };
 }
