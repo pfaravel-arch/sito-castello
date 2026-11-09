@@ -53,7 +53,7 @@
       '<label class="consenso"><input type="checkbox" name="consenso" required><span>Acconsento al trattamento dei miei dati per gestire la prenotazione, come descritto nell\'<a href="/privacy.html" target="_blank">informativa privacy</a>.</span></label>'+
       '<p class="errore-modulo" role="alert" hidden></p>'+
       '<button class="bottone bottone-pieno" type="submit">Conferma la prenotazione</button>'+
-      '<p class="nota-modulo">Lascia almeno un\'e-mail o un numero di telefono. La prenotazione è riservata ai soci dell\'associazione.</p>'+
+      '<p class="nota-modulo">Lascia almeno un\'e-mail o un numero di telefono.</p>'+
     '</form>';
     box.innerHTML=h;
     var form=box.querySelector('form'), err=box.querySelector('.errore-modulo'), btn=form.querySelector('button');
