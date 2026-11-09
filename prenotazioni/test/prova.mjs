@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { fintoServer } from "./prova-smtp.mjs";
-import worker, { fasceDi, prenotazioniAperte, slug, dataEstesa } from "../src/index.js";
+import worker, { fasceDi, prenotazioniAperte, slug, dataEstesa, avvisoPerEmail } from "../src/index.js";
 
 export function creaD1() {
   const db = new DatabaseSync(":memory:");
@@ -171,6 +171,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.match(r.dati.link_annullo, /annulla\.html\?c=[A-Z0-9]{6}&k=/); assert.equal(r.dati.telefono, "333 1112223");
   await Promise.all(attese); assert.equal(email.length, 1, "solo copia all'associazione se manca l'e-mail");
   assert.match(dataEstesa("2026-12-08"), /^martedì 8 dicembre 2026$/);
+  assert.equal(avvisoPerEmail("Prenotazione consigliata. Arriva 15 minuti prima."), "Arriva 15 minuti prima.");
+  assert.equal(avvisoPerEmail("Ingresso dal cortile. Prenotazione obbligatoria, posti limitati! Consigliato ai coraggiosi."), "Ingresso dal cortile. Consigliato ai coraggiosi.");
+  assert.equal(avvisoPerEmail("Prenotazione consigliata"), "");
 
   // modulo senza socio, tessera e note: niente riga "Tessera" nelle e-mail
   email.length = 0;

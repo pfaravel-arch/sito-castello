@@ -427,7 +427,15 @@ export function linkAnnullo(env, p) {
   return `${env.SITO || "https://www.castellodisilvanopietra.com"}/annulla.html?c=${p.codice}&k=${p.chiave}`;
 }
 
+// Nell'avviso dell'evento la frase sulla prenotazione serve sul sito, non nella conferma a chi ha gia' prenotato
+export function avvisoPerEmail(avviso) {
+  return String(avviso || "")
+    .replace(/(^|[.!?]\s*)\s*prenotazione\s+(consigliata|obbligatoria|richiesta|gradita|necessaria)[^.!?]*[.!?]?/gi, "$1")
+    .replace(/\s{2,}/g, " ").trim();
+}
+
 export function testoEmail(ev, p, link) {
+  ev = { ...ev, avviso: avvisoPerEmail(ev.avviso) };
   const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : ev.orario ? `, ${ev.orario}` : "");
   const righe = [
     ["Evento", ev.titolo], ["Quando", quando], ["Dove", ev.luogo || "Castello di Silvano Pietra"],
