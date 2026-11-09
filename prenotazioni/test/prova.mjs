@@ -182,6 +182,32 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal(email.length, 2);
   assert.ok(email.every((e) => !/Tessera/.test(e.textContent)), "nessuna riga Tessera senza la domanda sul socio");
 
+  // percorsi: Adulti e Bambini con posti separati negli stessi orari
+  r = await chiama("POST", "/admin/eventi", { titolo: "Escape room", data: giorno(20), stato: "pubblicato", pren_attive: true,
+    pren_fasce: ["16:00", "17:00"], pren_posti: 6, pren_max: 6, pren_percorsi: "Adulti, Bambini" }, A);
+  const idEsc = r.dati.id;
+  assert.equal((await chiama("POST", "/admin/eventi", { titolo: "X", data: giorno(20), pren_attive: true, pren_percorsi: "Solo" }, A)).status, 400);
+  r = await chiama("GET", "/eventi/" + idEsc);
+  assert.deepEqual(r.dati.percorsi.map((x) => x.nome), ["Adulti", "Bambini"]);
+  const pe = { evento: idEsc, fascia: "16:00", nome: "Ugo", cognome: "Verdi", email: "ugo@example.com", consenso: true };
+  assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 2 })).status, 400, "serve il percorso");
+  assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 2, percorso: "Nonni" })).status, 400);
+  email.length = 0;
+  assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 6, percorso: "Adulti" })).status, 201);
+  await Promise.all(attese);
+  assert.ok(email.some((e) => /Escape room – Adulti/.test(e.subject)), "percorso nell'oggetto");
+  assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 1, percorso: "Adulti" })).status, 409, "Adulti 16:00 pieno");
+  assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 6, percorso: "Bambini" })).status, 201, "Bambini ha i suoi posti");
+  r = await chiama("GET", "/eventi/" + idEsc);
+  assert.equal(r.dati.percorsi[0].fasce[0].liberi, 0); assert.equal(r.dati.percorsi[1].fasce[0].liberi, 0); assert.equal(r.dati.percorsi[1].fasce[1].liberi, 6);
+  const elEsc = (await chiama("GET", "/admin/prenotazioni?evento=" + idEsc, null, A)).dati;
+  assert.deepEqual(elEsc.map((x) => x.percorso), ["Adulti", "Bambini"]);
+  assert.deepEqual((await chiama("GET", "/admin/eventi/" + idEsc, null, A)).dati.pren_percorsi, ["Adulti", "Bambini"]);
+  await chiama("DELETE", "/admin/eventi/" + idEsc, null, A); // pubblicato con prenotazioni: resta
+  r = await chiama("GET", "/admin/eventi/" + idEsc, null, A);
+  await chiama("PUT", "/admin/eventi/" + idEsc, { ...r.dati, stato: "bozza" }, A);
+  assert.equal((await chiama("DELETE", "/admin/eventi/" + idEsc, null, A)).status, 200);
+
   // accesso con il codice dell'area riservata
   assert.equal((await chiama("GET", "/admin/eventi", null, { "X-Password": TOKEN })).status, 200);
   assert.equal((await chiama("GET", "/admin/eventi", null, { "X-Password": TOKEN + "x" })).status, 401);

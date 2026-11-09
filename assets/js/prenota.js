@@ -9,6 +9,12 @@
   // colore della fascia: verde finche' e' occupata meno della meta', giallo fino all'esaurimento, rosso se completa
   function livello(f){var tot=f.totale||f.liberi||1;return f.liberi<1?'piena':f.liberi>=tot/2?'libera':'quasi';}
   function postiTesto(f){return f.liberi<1?'completo':f.liberi+(f.liberi===1?' posto libero':' posti liberi');}
+  function griglia(fasce){
+    return '<fieldset class="turni"><legend>Scegli l\'orario di partenza</legend>'+fasce.map(function(f){
+      var off=f.liberi<1;
+      return '<label class="turno '+livello(f)+'"><input type="radio" name="fascia" value="'+esc(f.ora)+'"'+(off?' disabled':'')+' required><span class="ora">'+esc(f.ora)+'</span><span class="posti">'+postiTesto(f)+'</span></label>';
+    }).join('')+'<p class="legenda-turni"><span class="libera">posti liberi</span><span class="quasi">ultimi posti</span><span class="piena">completo</span></p></fieldset>';
+  }
   function contatti(msg){
     box.innerHTML='<p class="avviso-modulo">'+esc(msg)+'</p><p>Puoi prenotare scrivendo a <a href="mailto:castellodisilvanopietra@gmail.com">castellodisilvanopietra@gmail.com</a> o su WhatsApp al <a href="https://wa.me/393513479312">351 347 9312</a>.</p>';
   }
@@ -33,20 +39,23 @@
     document.title='Prenota: '+ev.titolo+' | Castello di Silvano Pietra';
     var h=(ev.bozza?'<p class="avviso-prova">Prova: questo evento è in bozza e il pubblico non lo vede. Le prenotazioni fatte qui spariscono quando elimini la bozza.</p>':'')+'<p class="dettagli-evento">'+esc(dataLunga(ev.data))+(ev.luogo?', '+esc(ev.luogo):'')+'</p><h1>'+esc(ev.titolo)+'</h1>';
     if(!ev.aperte){contatti('Le prenotazioni online per questo evento sono chiuse.');box.insertAdjacentHTML('afterbegin',h);return;}
-    var liberiTot=ev.fasce.reduce(function(s,f){return s+f.liberi;},0);
+    // con piu' percorsi (es. escape room Adulti e Bambini) si sceglie prima il percorso, poi l'orario
+    var perc=ev.percorsi&&ev.percorsi.length?ev.percorsi:null;
+    var somma=function(fs){return fs.reduce(function(s,f){return s+f.liberi;},0);};
+    var liberiTot=perc?perc.reduce(function(s,x){return s+somma(x.fasce);},0):somma(ev.fasce);
     if(!liberiTot){box.innerHTML=h+'<p class="avviso-modulo">Tutti i posti sono esauriti. Scrivici: se si libera un posto ti avvisiamo.</p>';return;}
     var unica=ev.fasce.length===1&&ev.fasce[0].ora==='unica';
     h+='<form class="modulo" novalidate>'+
-      (unica?'<input type="hidden" name="fascia" value="unica">':
-      '<fieldset class="turni"><legend>Scegli l\'orario di partenza</legend>'+ev.fasce.map(function(f){
-        var off=f.liberi<1;
-        return '<label class="turno '+livello(f)+'"><input type="radio" name="fascia" value="'+esc(f.ora)+'"'+(off?' disabled':'')+' required><span class="ora">'+esc(f.ora)+'</span><span class="posti">'+postiTesto(f)+'</span></label>';
-      }).join('')+'<p class="legenda-turni"><span class="libera">posti liberi</span><span class="quasi">ultimi posti</span><span class="piena">completo</span></p></fieldset>')+
+      (perc?'<fieldset class="percorsi"><legend>Scegli il percorso</legend>'+perc.map(function(x,i){
+        var lib=somma(x.fasce), off=lib<1;
+        return '<label class="percorso'+(off?' piena':'')+'"><input type="radio" name="percorso" value="'+esc(x.nome)+'" data-i="'+i+'"'+(off?' disabled':'')+' required><span class="nome">'+esc(x.nome)+'</span><span class="posti">'+(off?'completo':'posti disponibili')+'</span></label>';
+      }).join('')+'</fieldset>':'')+
+      (unica?'<input type="hidden" name="fascia" value="unica">':'<div class="box-turni">'+(perc?'<p class="nota-modulo">Scegli il percorso per vedere gli orari.</p>':griglia(ev.fasce))+'</div>')+
       '<div class="campi">'+
         '<label>Nome<input name="nome" autocomplete="given-name" required maxlength="60"></label>'+
         '<label>Cognome<input name="cognome" autocomplete="family-name" required maxlength="60"></label>'+
         '<label>E-mail<input name="email" type="email" autocomplete="email" maxlength="120" required></label>'+
-        '<label>Telefono <span class="facoltativo">(facoltativo)</span><input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>'+
+        '<label><span>Telefono <span class="facoltativo">(facoltativo)</span></span><input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>'+
         '<label>Numero di persone<input name="persone" type="number" min="1" max="'+ev.max_per_prenotazione+'" value="1" required></label>'+
       '</div>'+
       '<label class="nascosto" aria-hidden="true">Sito web<input name="sito_web" tabindex="-1" autocomplete="off"></label>'+
@@ -56,19 +65,22 @@
       '<p class="nota-modulo">Ti mandiamo la conferma per e-mail, con il link per annullare se non potrai più venire.</p>'+
     '</form>';
     box.innerHTML=h;
-    var form=box.querySelector('form'), err=box.querySelector('.errore-modulo'), btn=form.querySelector('button');
+    var form=box.querySelector('form'), err=box.querySelector('.errore-modulo'), btn=form.querySelector('button[type=submit]');
+    var boxTurni=form.querySelector('.box-turni');
+    function percorsoScelto(){var i=form.querySelector('input[name=percorso]:checked');return i?perc[Number(i.dataset.i)]:null;}
+    if(perc) form.querySelectorAll('input[name=percorso]').forEach(function(i){i.onchange=function(){if(boxTurni)boxTurni.innerHTML=griglia(percorsoScelto().fasce);};});
     form.addEventListener('submit',function(e){
       e.preventDefault(); err.hidden=true;
       var f=new FormData(form);
-      var dati={evento:id,fascia:f.get('fascia')||'',nome:f.get('nome'),cognome:f.get('cognome'),email:f.get('email'),telefono:f.get('telefono'),
+      var dati={evento:id,percorso:f.get('percorso')||'',fascia:f.get('fascia')||'',nome:f.get('nome'),cognome:f.get('cognome'),email:f.get('email'),telefono:f.get('telefono'),
         persone:Number(f.get('persone')),sito_web:f.get('sito_web'),consenso:form.consenso.checked};
-      var problema=!dati.fascia?'Scegli un orario.':!dati.nome||!dati.cognome?'Inserisci nome e cognome.':
+      var problema=perc&&!dati.percorso?'Scegli il percorso.':!dati.fascia?'Scegli un orario.':!dati.nome||!dati.cognome?'Inserisci nome e cognome.':
         !dati.email?'Inserisci il tuo indirizzo e-mail: ti mandiamo lì la conferma.':!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(dati.email)?'L\'indirizzo e-mail non sembra corretto.':!dati.consenso?'Serve il consenso al trattamento dei dati.':'';
       if(problema){err.textContent=problema;err.hidden=false;return;}
       btn.disabled=true; btn.textContent='Invio in corso…';
       chiamata('POST','/prenotazioni',dati).then(function(r){
         box.innerHTML='<div class="conferma"><p class="dettagli-evento">'+esc(dataLunga(r.data))+'</p><h1>Prenotazione confermata</h1>'+
-          '<p class="introduzione">'+esc(r.titolo)+(r.fascia!=='unica'?', partenza alle '+esc(r.fascia):'')+', '+r.persone+(r.persone===1?' persona':' persone')+'.</p>'+
+          '<p class="introduzione">'+esc(r.titolo)+(r.percorso?' – '+esc(r.percorso):'')+(r.fascia!=='unica'?', partenza alle '+esc(r.fascia):'')+', '+r.persone+(r.persone===1?' persona':' persone')+'.</p>'+
           '<p>Il tuo codice di prenotazione è</p><p class="codice">'+esc(r.codice)+'</p>'+
           (r.email_conferma?'<p>Ti abbiamo inviato una e-mail di conferma con tutti i dettagli: se non la trovi, controlla nello spam. Se non potrai più venire, nell\'e-mail trovi il link per annullare.</p>':'')+
           '<p>Annotalo o fai uno screenshot di questa pagina e mostralo all\'arrivo. Arriva con 15-30 minuti di anticipo rispetto all\'orario prenotato.</p>'+
@@ -77,7 +89,9 @@
       }).catch(function(e2){
         err.textContent=e2.message; err.hidden=false; btn.disabled=false; btn.textContent='Conferma la prenotazione';
         chiamata('GET','/eventi/'+encodeURIComponent(id)).then(function(ev2){ // aggiorna i posti liberi
-          ev2.fasce.forEach(function(x){var i=form.querySelector('input[name=fascia][value="'+x.ora+'"]');if(!i)return;var l=i.closest('.turno');
+          var ps=percorsoScelto(); if(ps) ps=(ev2.percorsi||[]).filter(function(x){return x.nome===ps.nome;})[0];
+          if(perc&&ps) perc[perc.map(function(x){return x.nome;}).indexOf(ps.nome)]=ps;
+          (ps?ps.fasce:ev2.fasce).forEach(function(x){var i=form.querySelector('input[name=fascia][value="'+x.ora+'"]');if(!i)return;var l=i.closest('.turno');
             l.querySelector('.posti').textContent=postiTesto(x);i.disabled=x.liberi<1;l.className='turno '+livello(x);if(i.disabled)i.checked=false;});
         }).catch(function(){});
       });

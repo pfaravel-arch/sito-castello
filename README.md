@@ -128,6 +128,12 @@ e copia si impostano in `wrangler.toml`. In alternativa, senza `SMTP_PASSWORD`, 
 secret `BREVO_API_KEY`. Se la password per le app viene revocata, le prenotazioni continuano a
 funzionare ma le e-mail non partono.
 
+### Percorsi con posti separati (es. escape room Adulti e Bambini)
+
+Nella scheda dell'evento, campo «Percorsi con posti separati»: per esempio `Adulti, Bambini`. Gli orari sono
+gli stessi, ma ogni percorso ha i suoi «Posti per ogni partenza». Nel modulo si sceglie prima il percorso e poi
+l'orario (con i colori per i posti liberi); conferme, annullamenti e Gestione prenotazioni indicano il percorso.
+
 ### Prenotazioni da WhatsApp, telefono o di persona
 
 Dal sito l'e-mail è obbligatoria. Chi prenota in altro modo si inserisce da Gestione prenotazioni con

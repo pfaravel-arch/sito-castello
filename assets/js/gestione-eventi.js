@@ -128,6 +128,7 @@
           '<div class="campi">'+
             '<label><span class="etichetta-posti">Posti per ogni partenza</span><input name="pren_posti" type="number" min="1" max="2000" value="'+esc(e.pren_posti||15)+'"></label>'+
             '<label>Massimo persone per prenotazione<input name="pren_max" type="number" min="1" max="2000" value="'+esc(e.pren_max||10)+'"></label>'+
+            '<label class="lungo">Percorsi con posti separati <span class="facoltativo">(es. «Adulti, Bambini»: stessi orari, ogni percorso ha i suoi posti per partenza; vuoto = percorso unico)</span><input name="pren_percorsi" maxlength="200" placeholder="Adulti, Bambini" value="'+esc((e.pren_percorsi||[]).join(', '))+'"></label>'+
             '<label class="lungo">Chiusura prenotazioni <span class="facoltativo">(vuoto = fino al giorno dell\'evento)</span><input name="pren_chiusura" type="datetime-local" value="'+esc(e.pren_chiusura||'')+'"></label>'+
           '</div>'+
         '</div>'+
@@ -165,7 +166,7 @@
       }
       var dati={titolo:form.titolo.value,data:form.data.value,fine:form.fine.value,orario:form.orario.value,luogo:form.luogo.value,
         descrizione:form.descrizione.value,avviso:form.avviso.value,stato:form.stato.value,in_evidenza:form.in_evidenza.checked,
-        pren_attive:form.pren_attive.checked,pren_fasce:fasce,pren_posti:Number(form.pren_posti.value),pren_max:Number(form.pren_max.value),pren_chiusura:form.pren_chiusura.value};
+        pren_attive:form.pren_attive.checked,pren_fasce:fasce,pren_posti:Number(form.pren_posti.value),pren_max:Number(form.pren_max.value),pren_chiusura:form.pren_chiusura.value,pren_percorsi:form.pren_percorsi.value};
       if(!dati.titolo.trim()||!dati.data){err.textContent='Titolo e data sono obbligatori.';err.hidden=false;return;}
       var btn=form.querySelector('[type=submit]'); btn.disabled=true; btn.textContent='Salvataggio…';
       var salvataggio=nuovo?chiamata('POST','/admin/eventi',dati):chiamata('PUT','/admin/eventi/'+e.id,dati);

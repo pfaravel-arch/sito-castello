@@ -86,7 +86,7 @@ async function instrada(request, env, ctx) {
 
 // ---------- eventi: lettura ----------
 
-const COLONNE = "id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, locandina_tipo, locandina_ver";
+const COLONNE = "id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, pren_percorsi, locandina_tipo, locandina_ver";
 
 async function rigaEvento(env, id) {
   await importaSeVuoto(env);
@@ -94,6 +94,13 @@ async function rigaEvento(env, id) {
   if (!r) throw new Errore("Evento non trovato.", 404);
   return r;
 }
+
+function percorsiDaRiga(r) {
+  if (!r.pren_percorsi) return [];
+  try { const a = JSON.parse(r.pren_percorsi); return Array.isArray(a) ? a : []; } catch { return []; }
+}
+// posti occupati: chiave "fascia" oppure "percorso|fascia"
+const chiaveOcc = (percorso, fascia) => (percorso ? percorso + "|" + fascia : fascia);
 
 function fasceDaRiga(r) {
   if (!r.pren_fasce) return null;
@@ -107,7 +114,7 @@ function evento(r, origine) {
     descrizione: r.descrizione || "", avviso: r.avviso || "", stato: r.stato, in_evidenza: !!r.in_evidenza,
     locandina: r.locandina_tipo ? `${origine}/locandine/${r.id}?v=${r.locandina_ver}` : null,
     prenotazioni: r.pren_attive ? {
-      id: r.id, fasce: fasceDaRiga(r), posti: Number(r.pren_posti) || 15,
+      id: r.id, fasce: fasceDaRiga(r), posti: Number(r.pren_posti) || 15, percorsi: percorsiDaRiga(r),
       max_per_prenotazione: Number(r.pren_max) || Number(r.pren_posti) || 15, chiusura: r.pren_chiusura || null,
     } : null,
   };
@@ -115,7 +122,7 @@ function evento(r, origine) {
 
 function perAdmin(r, origine) {
   return { ...evento(r, origine), pren_attive: !!r.pren_attive, pren_fasce: fasceDaRiga(r),
-    pren_posti: Number(r.pren_posti), pren_max: Number(r.pren_max), pren_chiusura: r.pren_chiusura || "" };
+    pren_posti: Number(r.pren_posti), pren_max: Number(r.pren_max), pren_chiusura: r.pren_chiusura || "", pren_percorsi: percorsiDaRiga(r) };
 }
 
 async function calendario(env, url) {
@@ -253,6 +260,9 @@ function validaEvento(d) {
   const posti = Number.parseInt(d.pren_posti, 10) || 15;
   if (pren && (posti < 1 || posti > 2000)) throw new Errore("I posti devono essere tra 1 e 2000.");
   const max = Math.min(posti, Number.parseInt(d.pren_max, 10) || posti);
+  let percorsi = Array.isArray(d.pren_percorsi) ? d.pren_percorsi : String(d.pren_percorsi || "").split(",");
+  percorsi = [...new Set(percorsi.map((x) => testo(x, 40)).filter(Boolean))].slice(0, 6);
+  if (percorsi.length === 1) throw new Errore("Indica almeno due percorsi (es. Adulti, Bambini) oppure lascia il campo vuoto.");
   const chiusura = testo(d.pren_chiusura, 16) || null;
   if (chiusura && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(chiusura)) throw new Errore("La data di chiusura delle prenotazioni non è valida.");
   return {
@@ -260,6 +270,7 @@ function validaEvento(d) {
     descrizione: testoLungo(d.descrizione, 3000) || null, avviso: testoLungo(d.avviso, 600) || null,
     in_evidenza: d.in_evidenza ? 1 : 0, pren_attive: pren ? 1 : 0, pren_fasce: fasce ? JSON.stringify(fasce) : null,
     pren_posti: posti, pren_max: Math.max(1, max), pren_chiusura: chiusura,
+    pren_percorsi: pren && percorsi.length ? JSON.stringify(percorsi) : null,
   };
 }
 
@@ -270,10 +281,10 @@ async function adminCrea(env, d) {
   for (let i = 2; await env.DB.prepare("SELECT 1 FROM eventi WHERE id = ?").bind(id).first(); i++) id = `${slug(v.titolo, v.data)}-${i}`;
   if (v.in_evidenza) await env.DB.prepare("UPDATE eventi SET in_evidenza = 0").run();
   await env.DB.prepare(
-    `INSERT INTO eventi (id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO eventi (id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, pren_percorsi)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(id, v.titolo, v.data, v.fine, v.orario, v.luogo, v.descrizione, v.avviso, v.stato, v.in_evidenza,
-    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura).run();
+    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, v.pren_percorsi).run();
   return json({ id }, 201);
 }
 
@@ -283,9 +294,9 @@ async function adminModifica(env, id, d, origine) {
   if (v.in_evidenza) await env.DB.prepare("UPDATE eventi SET in_evidenza = 0 WHERE id != ?").bind(id).run();
   await env.DB.prepare(
     `UPDATE eventi SET titolo = ?, data = ?, fine = ?, orario = ?, luogo = ?, descrizione = ?, avviso = ?, stato = ?, in_evidenza = ?,
-       pren_attive = ?, pren_fasce = ?, pren_posti = ?, pren_max = ?, pren_chiusura = ?, aggiornato = datetime('now') WHERE id = ?`
+       pren_attive = ?, pren_fasce = ?, pren_posti = ?, pren_max = ?, pren_chiusura = ?, pren_percorsi = ?, aggiornato = datetime('now') WHERE id = ?`
   ).bind(v.titolo, v.data, v.fine, v.orario, v.luogo, v.descrizione, v.avviso, v.stato, v.in_evidenza,
-    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, id).run();
+    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, v.pren_percorsi, id).run();
   return json(perAdmin(await rigaEvento(env, id), origine));
 }
 
@@ -321,10 +332,10 @@ async function adminTogliLocandina(env, id) {
 
 async function occupati(env, evento) {
   const { results } = await env.DB.prepare(
-    "SELECT fascia, COALESCE(SUM(persone),0) AS occupati FROM prenotazioni WHERE evento = ? AND stato != 'annullata' GROUP BY fascia"
+    "SELECT percorso, fascia, COALESCE(SUM(persone),0) AS occupati FROM prenotazioni WHERE evento = ? AND stato != 'annullata' GROUP BY percorso, fascia"
   ).bind(evento).all();
   const mappa = {};
-  for (const r of results) mappa[r.fascia] = Number(r.occupati);
+  for (const r of results) mappa[chiaveOcc(r.percorso, r.fascia)] = Number(r.occupati);
   return mappa;
 }
 
@@ -336,6 +347,9 @@ async function disponibilita(env, id, admin) {
     id, titolo: ev.titolo, data: ev.data, luogo: ev.luogo, aperte: prenotazioniAperte(ev), bozza: ev.stato === "bozza",
     max_per_prenotazione: Math.min(posti, ev.prenotazioni.max_per_prenotazione),
     fasce: fasceDi(ev).map((ora) => ({ ora, totale: posti, liberi: Math.max(0, posti - (occ[ora] || 0)) })),
+    // con piu' percorsi (es. Adulti e Bambini) ogni percorso ha i suoi posti negli stessi orari
+    percorsi: ev.prenotazioni.percorsi.map((nome) => ({ nome,
+      fasce: fasceDi(ev).map((ora) => ({ ora, totale: posti, liberi: Math.max(0, posti - (occ[chiaveOcc(nome, ora)] || 0)) })) })),
   });
 }
 
@@ -348,6 +362,9 @@ async function prenota(env, d, ctx, admin) {
 
   const fascia = testo(d.fascia, 10);
   if (!fasceDi(ev).includes(fascia)) throw new Errore("Scegli una fascia oraria valida.");
+  const percorsi = ev.prenotazioni.percorsi;
+  const percorso = percorsi.length ? testo(d.percorso, 40) : "";
+  if (percorsi.length && !percorsi.includes(percorso)) throw new Errore(`Scegli il percorso: ${percorsi.join(" o ")}.`);
   const nome = testo(d.nome, 60), cognome = testo(d.cognome, 60);
   if (!nome || !cognome) throw new Errore("Inserisci nome e cognome.");
   const email = testo(d.email, 120).toLowerCase();
@@ -379,22 +396,22 @@ async function prenota(env, d, ctx, admin) {
     try {
       // Inserisce solo se c'è ancora posto: controllo e scrittura in un'unica istruzione
       const res = await env.DB.prepare(
-        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, chiave_annullo, origine)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, chiave_annullo, origine, percorso)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE (SELECT COALESCE(SUM(persone),0) FROM prenotazioni
-                WHERE evento = ? AND fascia = ? AND stato != 'annullata') + ? <= ?`
-      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null, chiave, origine,
-             ev.id, fascia, persone, posti).run();
+                WHERE evento = ? AND percorso = ? AND fascia = ? AND stato != 'annullata') + ? <= ?`
+      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null, chiave, origine, percorso,
+             ev.id, percorso, fascia, persone, posti).run();
       if (!res.meta || res.meta.changes !== 1) {
-        const liberi = Math.max(0, posti - ((await occupati(env, ev.id))[fascia] || 0));
+        const liberi = Math.max(0, posti - ((await occupati(env, ev.id))[chiaveOcc(percorso, fascia)] || 0));
         throw new Errore(liberi
           ? `In questa fascia restano solo ${liberi} posti: riduci il numero di persone o scegli un altro orario.`
           : "Questa fascia oraria è appena stata completata: scegline un'altra.", 409);
       }
-      const p = { codice, chiave, nome, cognome, email, telefono, persone, fascia, socio, tessera, note, origine };
+      const p = { codice, chiave, nome, cognome, email, telefono, persone, fascia, socio, tessera, note, origine, percorso };
       const conferma = !!(email && emailAttiva(env));
       if (emailAttiva(env)) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
-      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, email_conferma: conferma,
+      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, percorso, email_conferma: conferma,
         ...(staff ? { nome, telefono, link_annullo: linkAnnullo(env, p) } : {}) }, 201);
     } catch (e) {
       if (e instanceof Errore) throw e;
@@ -434,8 +451,11 @@ export function avvisoPerEmail(avviso) {
     .replace(/\s{2,}/g, " ").trim();
 }
 
+// "Escape room – Bambini" quando l'evento ha piu' percorsi
+const conPercorso = (ev, p) => (p && p.percorso ? { ...ev, titolo: `${ev.titolo} – ${p.percorso}` } : ev);
+
 export function testoEmail(ev, p, link) {
-  ev = { ...ev, avviso: avvisoPerEmail(ev.avviso) };
+  ev = { ...conPercorso(ev, p), avviso: avvisoPerEmail(ev.avviso) };
   const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : ev.orario ? `, ${ev.orario}` : "");
   const righe = [
     ["Evento", ev.titolo], ["Quando", quando], ["Dove", ev.luogo || "Castello di Silvano Pietra"],
@@ -502,6 +522,7 @@ async function inviaBrevo(env, a, nomeA, oggetto, testo, html) {
 
 async function inviaEmailPrenotazione(env, ev, p) {
   const m = testoEmail(ev, p, p.chiave ? linkAnnullo(env, p) : null);
+  ev = conPercorso(ev, p);
   const invii = [];
   if (p.email) invii.push(invia(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
   if (env.EMAIL_COPIA) {
@@ -530,7 +551,7 @@ async function annullabile(env, r) {
 async function datiPerAnnullo(env, codice, k) {
   const r = await prenotazioneConChiave(env, codice, k);
   const { ev, puo } = await annullabile(env, r);
-  return json({ codice, nome: r.nome, persone: r.persone, fascia: r.fascia, stato: r.stato, annullabile: puo,
+  return json({ codice, nome: r.nome, persone: r.persone, fascia: r.fascia, percorso: r.percorso || "", stato: r.stato, annullabile: puo,
     titolo: ev ? ev.titolo : "", data: ev ? ev.data : "", orario: ev ? ev.orario : "", luogo: ev ? ev.luogo : "" });
 }
 
@@ -545,6 +566,7 @@ async function annullaDalPartecipante(env, codice, k, ctx) {
 }
 
 export function testoEmailAnnullo(ev, p) {
+  ev = conPercorso(ev, p);
   const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : "");
   const oggetto = `Prenotazione annullata: ${ev.titolo} (codice ${p.codice})`;
   const testo = `Ciao ${p.nome},\n\nabbiamo annullato la tua prenotazione ${p.codice} per ${ev.titolo}, ${quando}, ${p.persone} ${p.persone === 1 ? "persona" : "persone"}.\n` +
@@ -564,6 +586,7 @@ export function testoEmailAnnullo(ev, p) {
 }
 
 async function inviaEmailAnnullo(env, ev, p) {
+  ev = conPercorso(ev, p);
   const m = testoEmailAnnullo(ev, p);
   const invii = [];
   if (p.email) invii.push(invia(env, p.email, `${p.nome} ${p.cognome}`, m.oggetto, m.testo, m.html));
@@ -611,7 +634,7 @@ async function adminEventi(env, soloPrenotabili) {
       return {
         ...e, locandina: !!r.locandina_tipo, locandina_ver: Number(r.locandina_ver),
         aperte: !!r.pren_attive && r.stato === "pubblicato" && prenotazioniAperte(conPren),
-        posti_per_fascia: e.pren_posti, fasce: fasceDi(conPren),
+        posti_per_fascia: e.pren_posti, fasce: fasceDi(conPren), percorsi: e.pren_percorsi,
         prenotazioni: Number(tot[r.id]?.prenotazioni || 0),
         persone: Number(tot[r.id]?.persone || 0),
         pagati: Number(tot[r.id]?.pagati || 0),
@@ -622,7 +645,7 @@ async function adminEventi(env, soloPrenotabili) {
 async function adminElenco(env, evento) {
   if (!evento) throw new Errore("Indica l'evento.");
   const { results } = await env.DB.prepare(
-    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, annullata_da, pagato, creata, origine, chiave_annullo FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
+    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, annullata_da, pagato, creata, origine, percorso, chiave_annullo FROM prenotazioni WHERE evento = ? ORDER BY percorso, fascia, creata"
   ).bind(evento).all();
   return json(results.map(({ chiave_annullo, ...r }) => ({ ...r, pagato: !!r.pagato,
     link_annullo: chiave_annullo ? linkAnnullo(env, { codice: r.codice, chiave: chiave_annullo }) : null })));

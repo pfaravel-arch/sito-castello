@@ -183,6 +183,16 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .turno.piena .ora{color:#8E2F26}
 .turno.piena .posti{color:#8E2F26;font-weight:600}
 .turno.libera:has(input:checked),.turno.quasi:has(input:checked){border-color:var(--guado);box-shadow:inset 0 0 0 3px var(--guado)}
+.percorsi{border:0;padding:0;margin:0 0 1.4rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.6rem}
+.percorsi legend{font-family:var(--serif-titoli);font-size:1.3rem;margin-bottom:.8rem;padding:0}
+.modulo .percorso{flex-direction:column;align-items:flex-start;gap:.15rem;border:1px solid var(--linea);background:#fff;padding:.8rem 1rem;cursor:pointer;position:relative}
+.percorso input{position:absolute;opacity:0;pointer-events:none}
+.percorso .nome{font-family:var(--serif-titoli);font-size:1.45rem;line-height:1.1}
+.percorso .posti{font-size:.85rem;color:var(--carbone-tenue)}
+.percorso:has(input:checked){border-color:var(--guado);box-shadow:inset 0 0 0 3px var(--guado);background:#EDF2F8}
+.percorso:has(input:focus-visible){outline:2px solid var(--ocra);outline-offset:2px}
+.percorso.piena{background:#F7E0DD;border-color:#D08A82;cursor:not-allowed}
+.percorso.piena .posti{color:#8E2F26;font-weight:600}
 .legenda-turni{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin:.4rem 0 0;font-size:.82rem;color:var(--carbone-tenue)}
 .legenda-turni span::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.35em;vertical-align:-.05em;border:1px solid}
 .legenda-turni .libera::before{background:#E6F2E7;border-color:#7FB287}
