@@ -5,7 +5,9 @@
 //   GET  /calendario             eventi pubblicati (per le pagine Home ed Eventi)
 //   GET  /locandine/:id          immagine della locandina
 //   GET  /eventi/:id             fasce orarie e posti liberi di un evento prenotabile
-//   POST /prenotazioni           crea una prenotazione (controlla i posti in modo atomico)
+//   POST /prenotazioni           crea una prenotazione (controlla i posti in modo atomico); e-mail obbligatoria.
+//                                Con "X-Password" e { staff: true, origine } la inserisce lo staff (WhatsApp, telefono...):
+//                                basta il telefono e la risposta contiene il link di annullamento da girare al partecipante
 //   GET  /prenotazioni/:codice?k=CHIAVE          riepilogo per la pagina di annullamento
 //   POST /prenotazioni/:codice/annulla {k}       annulla dal link nell'e-mail e libera i posti
 // Riservato (intestazione "X-Password" = segreto ADMIN_PASSWORD):
@@ -25,6 +27,7 @@ import { componiMessaggio, inviaSmtp } from "./smtp.js";
 
 const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // senza 0/O e 1/I
 const STATI = ["bozza", "pubblicato", "chiuso"];
+const ORIGINI_STAFF = ["whatsapp", "telefono", "di persona", "email"];
 const TIPI_IMMAGINE = ["image/jpeg", "image/png", "image/webp"];
 const MAX_LOCANDINA = 1_800_000;
 
@@ -339,7 +342,9 @@ async function disponibilita(env, id, admin) {
 async function prenota(env, d, ctx, admin) {
   if (d.sito_web) throw new Errore("Richiesta non valida."); // campo esca per i robot
   const ev = await eventoPrenotabile(env, testo(d.evento, 60), admin);
-  if (!prenotazioniAperte(ev)) throw new Errore("Le prenotazioni per questo evento sono chiuse.", 409);
+  const staff = !!admin && d.staff === true;  // inserita dallo staff in Gestione prenotazioni
+  // lo staff puo' aggiungere anche dopo la chiusura online, ma non se l'evento e' "Chiuso"
+  if (!prenotazioniAperte(ev) && !(staff && !ev.chiuso)) throw new Errore("Le prenotazioni per questo evento sono chiuse.", 409);
 
   const fascia = testo(d.fascia, 10);
   if (!fasceDi(ev).includes(fascia)) throw new Errore("Scegli una fascia oraria valida.");
@@ -349,9 +354,11 @@ async function prenota(env, d, ctx, admin) {
   const telefono = testo(d.telefono, 30);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Errore("L'indirizzo e-mail non sembra corretto.");
   if (telefono && !/^[+0-9 ().-]{6,30}$/.test(telefono)) throw new Errore("Il numero di telefono non sembra corretto.");
-  if (!email && !telefono) throw new Errore("Lascia almeno un'e-mail o un numero di telefono, così possiamo contattarti.");
+  if (!staff && !email) throw new Errore("Inserisci il tuo indirizzo e-mail: ti mandiamo lì la conferma della prenotazione.");
+  if (!email && !telefono) throw new Errore("Serve almeno un'e-mail o un numero di telefono.");
   const posti = ev.prenotazioni.posti;
-  const maxPer = Math.min(posti, ev.prenotazioni.max_per_prenotazione);
+  const maxPer = staff ? posti : Math.min(posti, ev.prenotazioni.max_per_prenotazione);
+  const origine = !staff ? "sito" : ORIGINI_STAFF.includes(d.origine) ? d.origine : "telefono";
   const persone = Number.parseInt(d.persone, 10);
   if (!Number.isInteger(persone) || persone < 1 || persone > maxPer) throw new Errore(`Il numero di persone deve essere tra 1 e ${maxPer}.`);
   // il modulo non chiede piu' se e' socio ne' la tessera: si registra vuoto ("")
@@ -363,7 +370,7 @@ async function prenota(env, d, ctx, admin) {
     if (!m) throw new Errore("Il numero di tessera non sembra corretto: scrivilo come sulla tessera, per esempio 2026-001.");
     tessera = `${m[1]}-${m[2].padStart(3, "0")}`;
   }
-  if (d.consenso !== true) throw new Errore("Per prenotare serve il consenso al trattamento dei dati.");
+  if (d.consenso !== true && !staff) throw new Errore("Per prenotare serve il consenso al trattamento dei dati.");
   const note = testo(d.note, 300);
 
   const chiave = nuovaChiave();
@@ -372,11 +379,11 @@ async function prenota(env, d, ctx, admin) {
     try {
       // Inserisce solo se c'è ancora posto: controllo e scrittura in un'unica istruzione
       const res = await env.DB.prepare(
-        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, chiave_annullo)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO prenotazioni (codice, evento, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, chiave_annullo, origine)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE (SELECT COALESCE(SUM(persone),0) FROM prenotazioni
                 WHERE evento = ? AND fascia = ? AND stato != 'annullata') + ? <= ?`
-      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null, chiave,
+      ).bind(codice, ev.id, fascia, nome, cognome, email || null, telefono || null, persone, socio, tessera, note || null, chiave, origine,
              ev.id, fascia, persone, posti).run();
       if (!res.meta || res.meta.changes !== 1) {
         const liberi = Math.max(0, posti - ((await occupati(env, ev.id))[fascia] || 0));
@@ -384,10 +391,11 @@ async function prenota(env, d, ctx, admin) {
           ? `In questa fascia restano solo ${liberi} posti: riduci il numero di persone o scegli un altro orario.`
           : "Questa fascia oraria è appena stata completata: scegline un'altra.", 409);
       }
-      const p = { codice, chiave, nome, cognome, email, telefono, persone, fascia, socio, tessera, note };
+      const p = { codice, chiave, nome, cognome, email, telefono, persone, fascia, socio, tessera, note, origine };
       const conferma = !!(email && emailAttiva(env));
       if (emailAttiva(env)) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
-      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, email_conferma: conferma }, 201);
+      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, email_conferma: conferma,
+        ...(staff ? { nome, telefono, link_annullo: linkAnnullo(env, p) } : {}) }, 201);
     } catch (e) {
       if (e instanceof Errore) throw e;
       if (!/UNIQUE/i.test(String(e && e.message))) throw e; // codice già usato: ne genera un altro
@@ -606,9 +614,10 @@ async function adminEventi(env, soloPrenotabili) {
 async function adminElenco(env, evento) {
   if (!evento) throw new Errore("Indica l'evento.");
   const { results } = await env.DB.prepare(
-    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, annullata_da, pagato, creata FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
+    "SELECT codice, fascia, nome, cognome, email, telefono, persone, socio, tessera, note, stato, annullata_da, pagato, creata, origine, chiave_annullo FROM prenotazioni WHERE evento = ? ORDER BY fascia, creata"
   ).bind(evento).all();
-  return json(results.map((r) => ({ ...r, pagato: !!r.pagato })));
+  return json(results.map(({ chiave_annullo, ...r }) => ({ ...r, pagato: !!r.pagato,
+    link_annullo: chiave_annullo ? linkAnnullo(env, { codice: r.codice, chiave: chiave_annullo }) : null })));
 }
 
 async function adminAggiorna(env, codice, d) {

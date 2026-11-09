@@ -128,6 +128,15 @@ e copia si impostano in `wrangler.toml`. In alternativa, senza `SMTP_PASSWORD`, 
 secret `BREVO_API_KEY`. Se la password per le app viene revocata, le prenotazioni continuano a
 funzionare ma le e-mail non partono.
 
+### Prenotazioni da WhatsApp, telefono o di persona
+
+Dal sito l'e-mail è obbligatoria. Chi prenota in altro modo si inserisce da Gestione prenotazioni con
+«Aggiungi prenotazione» (basta il telefono; si indica il canale: WhatsApp, telefono, di persona, e-mail).
+I posti vengono controllati come per il sito e lo staff può aggiungere anche dopo la chiusura online
+(non se l'evento è «Chiuso»). Dopo il salvataggio «Invia la conferma su WhatsApp» apre WhatsApp con il
+messaggio pronto (codice, link di annullamento, informativa); lo stesso link c'è su ogni riga con telefono.
+Se si inserisce l'e-mail parte anche la conferma automatica. Il canale è nella colonna `origine`.
+
 ### Annullamento da parte del partecipante
 
 Ogni e-mail di conferma contiene un link personale `/annulla.html?c=CODICE&k=CHIAVE` (chiave casuale

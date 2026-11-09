@@ -89,13 +89,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal((await chiama("GET", "/calendario")).dati.length, 1);
   assert.equal((await chiama("GET", "/eventi/" + id)).status, 404, "bozza non prenotabile dal pubblico");
   r = await chiama("GET", "/eventi/" + id, null, A); assert.equal(r.status, 200); assert.equal(r.dati.bozza, true);
-  r = await chiama("POST", "/prenotazioni", { evento: id, fascia: "15:30", nome: "Prova", cognome: "Prova", telefono: "3330000000", persone: 2, consenso: true }, A);
+  r = await chiama("POST", "/prenotazioni", { evento: id, fascia: "15:30", nome: "Prova", cognome: "Prova", email: "prova@example.com", telefono: "3330000000", persone: 2, consenso: true }, A);
   assert.equal(r.status, 201, "prova sulla bozza dall'area riservata");
   assert.equal((await chiama("POST", "/prenotazioni", { evento: id, fascia: "15:00", nome: "X", cognome: "Y", telefono: "3330000000", persone: 1, consenso: true })).status, 404);
   // la bozza con prenotazioni di prova si elimina insieme alle prenotazioni
   r = await chiama("POST", "/admin/eventi", { titolo: "Prova bozza", data: giorno(9), pren_attive: true }, A);
   const idProva = r.dati.id;
-  await chiama("POST", "/prenotazioni", { evento: idProva, fascia: "unica", nome: "P", cognome: "Q", telefono: "3330000000", persone: 1, consenso: true }, A);
+  await chiama("POST", "/prenotazioni", { evento: idProva, fascia: "unica", nome: "P", cognome: "Q", email: "p@example.com", persone: 1, consenso: true }, A);
   r = await chiama("DELETE", "/admin/eventi/" + idProva, null, A);
   assert.equal(r.status, 200); assert.equal(r.dati.prenotazioni_eliminate, 1);
   assert.equal((await chiama("GET", "/admin/prenotazioni?evento=" + idProva, null, A)).dati.length, 0);
@@ -161,8 +161,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal((await chiama("GET", `/prenotazioni/${cod}?k=${k}`)).dati.annullabile, false);
   email.length = 0;
   email.length = 0;
-  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "", telefono: "333 1112223", socio: "richiesta", tessera: "2026-001" });
-  assert.equal(r.status, 201); assert.equal(r.dati.email_conferma, false);
+  // dal sito l'e-mail e' obbligatoria
+  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "", telefono: "333 1112223" });
+  assert.equal(r.status, 400); assert.match(r.dati.errore, /e-mail/);
+  assert.equal((await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "", telefono: "333 1112223", staff: true })).status, 400, "staff senza password");
+  // inserita dallo staff (WhatsApp): basta il telefono, niente consenso dal modulo, torna il link di annullamento
+  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "", telefono: "333 1112223", consenso: false, socio: "richiesta", tessera: "2026-001", staff: true, origine: "whatsapp" }, A);
+  assert.equal(r.status, 201, JSON.stringify(r.dati)); assert.equal(r.dati.email_conferma, false);
+  assert.match(r.dati.link_annullo, /annulla\.html\?c=[A-Z0-9]{6}&k=/); assert.equal(r.dati.telefono, "333 1112223");
   await Promise.all(attese); assert.equal(email.length, 1, "solo copia all'associazione se manca l'e-mail");
   assert.match(dataEstesa("2026-12-08"), /^martedì 8 dicembre 2026$/);
 
@@ -182,7 +188,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 19); assert.equal(r.dati[0].aperte, true);
   assert.equal((await chiama("GET", "/admin/eventi", null, A)).dati.length, 2);
   const elenco = (await chiama("GET", "/admin/prenotazioni?evento=" + id, null, A)).dati;
-  assert.equal(elenco.length, 7); assert.equal(elenco.find((x) => x.email === "anna@example.com").socio, ""); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
+  assert.equal(elenco.length, 7); assert.equal(elenco.find((x) => x.email === "anna@example.com").socio, "");
+  assert.equal(elenco.find((x) => x.telefono === "333 1112223").origine, "whatsapp"); assert.equal(elenco.find((x) => x.email === "anna@example.com").origine, "sito");
+  assert.ok(elenco.every((x) => !("chiave_annullo" in x)) && elenco.find((x) => x.origine === "whatsapp").link_annullo); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
   assert.equal(elenco.find((x) => x.socio === "richiesta").tessera, null, "chi chiede di aderire non ha tessera");
   assert.equal((await chiama("PATCH", "/admin/prenotazioni/" + codice, { stato: "annullata" }, A)).status, 200);
   assert.equal((await chiama("GET", "/eventi/" + id)).dati.fasce[0].liberi, 4);

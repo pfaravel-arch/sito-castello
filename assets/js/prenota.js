@@ -45,15 +45,15 @@
       '<div class="campi">'+
         '<label>Nome<input name="nome" autocomplete="given-name" required maxlength="60"></label>'+
         '<label>Cognome<input name="cognome" autocomplete="family-name" required maxlength="60"></label>'+
-        '<label>E-mail<input name="email" type="email" autocomplete="email" maxlength="120"></label>'+
-        '<label>Telefono<input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>'+
+        '<label>E-mail<input name="email" type="email" autocomplete="email" maxlength="120" required></label>'+
+        '<label>Telefono <span class="facoltativo">(facoltativo)</span><input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>'+
         '<label>Numero di persone<input name="persone" type="number" min="1" max="'+ev.max_per_prenotazione+'" value="1" required></label>'+
       '</div>'+
       '<label class="nascosto" aria-hidden="true">Sito web<input name="sito_web" tabindex="-1" autocomplete="off"></label>'+
       '<label class="consenso"><input type="checkbox" name="consenso" required><span>Acconsento al trattamento dei miei dati per gestire la prenotazione, come descritto nell\'<a href="/privacy.html" target="_blank">informativa privacy</a>.</span></label>'+
       '<p class="errore-modulo" role="alert" hidden></p>'+
       '<button class="bottone bottone-pieno" type="submit">Conferma la prenotazione</button>'+
-      '<p class="nota-modulo">Lascia almeno un\'e-mail o un numero di telefono.</p>'+
+      '<p class="nota-modulo">Ti mandiamo la conferma per e-mail, con il link per annullare se non potrai più venire.</p>'+
     '</form>';
     box.innerHTML=h;
     var form=box.querySelector('form'), err=box.querySelector('.errore-modulo'), btn=form.querySelector('button');
@@ -63,7 +63,7 @@
       var dati={evento:id,fascia:f.get('fascia')||'',nome:f.get('nome'),cognome:f.get('cognome'),email:f.get('email'),telefono:f.get('telefono'),
         persone:Number(f.get('persone')),sito_web:f.get('sito_web'),consenso:form.consenso.checked};
       var problema=!dati.fascia?'Scegli un orario.':!dati.nome||!dati.cognome?'Inserisci nome e cognome.':
-        !dati.email&&!dati.telefono?'Lascia almeno un\'e-mail o un numero di telefono.':!dati.consenso?'Serve il consenso al trattamento dei dati.':'';
+        !dati.email?'Inserisci il tuo indirizzo e-mail: ti mandiamo lì la conferma.':!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(dati.email)?'L\'indirizzo e-mail non sembra corretto.':!dati.consenso?'Serve il consenso al trattamento dei dati.':'';
       if(problema){err.textContent=problema;err.hidden=false;return;}
       btn.disabled=true; btn.textContent='Invio in corso…';
       chiamata('POST','/prenotazioni',dati).then(function(r){
