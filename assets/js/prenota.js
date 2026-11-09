@@ -46,11 +46,13 @@
     if(!liberiTot){box.innerHTML=h+'<p class="avviso-modulo">Tutti i posti sono esauriti. Scrivici: se si libera un posto ti avvisiamo.</p>';return;}
     var unica=ev.fasce.length===1&&ev.fasce[0].ora==='unica';
     h+='<form class="modulo" novalidate>'+
-      (perc?'<fieldset class="percorsi"><legend>Scegli il percorso</legend>'+perc.map(function(x,i){
+      (perc?'<fieldset class="percorsi"><legend>'+(perc.some(function(x){return x.escape;})?'Scegli la escape room':'Scegli il percorso')+'</legend>'+perc.map(function(x,i){
         var lib=somma(x.fasce), off=lib<1;
-        return '<label class="percorso'+(off?' piena':'')+'"><input type="radio" name="percorso" value="'+esc(x.nome)+'" data-i="'+i+'"'+(off?' disabled':'')+' required><span class="nome">'+esc(x.nome)+'</span><span class="posti">'+(off?'completo':'posti disponibili')+'</span></label>';
+        return '<label class="percorso'+(off?' piena':'')+'"><input type="radio" name="percorso" value="'+esc(x.nome)+'" data-i="'+i+'"'+(off?' disabled':'')+' required>'+
+          (x.escape?'<span class="nome">'+esc(x.escape)+'</span><span class="chi">'+esc(x.nome)+'</span>':'<span class="nome">'+esc(x.nome)+'</span>')+
+          (x.nota?'<span class="nota">'+esc(x.nota)+'</span>':'')+'<span class="posti">'+(off?'completo':'posti disponibili')+'</span></label>';
       }).join('')+'</fieldset>':'')+
-      (unica?'<input type="hidden" name="fascia" value="unica">':'<div class="box-turni">'+(perc?'<p class="nota-modulo">Scegli il percorso per vedere gli orari.</p>':griglia(ev.fasce))+'</div>')+
+      (unica?'<input type="hidden" name="fascia" value="unica">':'<div class="box-turni">'+(perc?'<p class="nota-modulo">Scegli prima '+(perc.some(function(x){return x.escape;})?'la escape room':'il percorso')+' per vedere gli orari.</p>':griglia(ev.fasce))+'</div>')+
       '<div class="campi">'+
         '<label>Nome<input name="nome" autocomplete="given-name" required maxlength="60"></label>'+
         '<label>Cognome<input name="cognome" autocomplete="family-name" required maxlength="60"></label>'+
@@ -80,7 +82,7 @@
       btn.disabled=true; btn.textContent='Invio in corso…';
       chiamata('POST','/prenotazioni',dati).then(function(r){
         box.innerHTML='<div class="conferma"><p class="dettagli-evento">'+esc(dataLunga(r.data))+'</p><h1>Prenotazione confermata</h1>'+
-          '<p class="introduzione">'+esc(r.titolo)+(r.percorso?' – '+esc(r.percorso):'')+(r.fascia!=='unica'?', partenza alle '+esc(r.fascia):'')+', '+r.persone+(r.persone===1?' persona':' persone')+'.</p>'+
+          '<p class="introduzione">'+esc(r.titolo)+(r.percorso?' – '+esc(r.percorso_etichetta||r.percorso):'')+(r.fascia!=='unica'?', partenza alle '+esc(r.fascia):'')+', '+r.persone+(r.persone===1?' persona':' persone')+'.</p>'+
           '<p>Il tuo codice di prenotazione è</p><p class="codice">'+esc(r.codice)+'</p>'+
           (r.email_conferma?'<p>Ti abbiamo inviato una e-mail di conferma con tutti i dettagli: se non la trovi, controlla nello spam. Se non potrai più venire, nell\'e-mail trovi il link per annullare.</p>':'')+
           '<p>Annotalo o fai uno screenshot di questa pagina e mostralo all\'arrivo. Arriva con 15-30 minuti di anticipo rispetto all\'orario prenotato.</p>'+

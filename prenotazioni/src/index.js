@@ -95,9 +95,19 @@ async function rigaEvento(env, id) {
   return r;
 }
 
+// Percorsi: [{ nome: "Bambini", escape: "Il laboratorio di Babbo Natale", nota: "dai 6 ai 12 anni" }, ...]
+// (i primi eventi li salvavano come semplici nomi: ["Adulti","Bambini"])
 function percorsiDaRiga(r) {
   if (!r.pren_percorsi) return [];
-  try { const a = JSON.parse(r.pren_percorsi); return Array.isArray(a) ? a : []; } catch { return []; }
+  let a; try { a = JSON.parse(r.pren_percorsi); } catch { return []; }
+  if (!Array.isArray(a)) return [];
+  return a.map((x) => (typeof x === "string" ? { nome: x, escape: "", nota: "" } : { nome: String(x.nome || ""), escape: String(x.escape || ""), nota: String(x.nota || "") }))
+    .filter((x) => x.nome);
+}
+// "Il laboratorio di Babbo Natale (Bambini)", o solo "Bambini" se manca il nome della escape
+function etichettaPercorso(ev, nome) {
+  const d = ((ev.prenotazioni && ev.prenotazioni.percorsi) || []).find((x) => x.nome === nome);
+  return d && d.escape ? `${d.escape} (${nome})` : nome;
 }
 // posti occupati: chiave "fascia" oppure "percorso|fascia"
 const chiaveOcc = (percorso, fascia) => (percorso ? percorso + "|" + fascia : fascia);
@@ -261,8 +271,15 @@ function validaEvento(d) {
   if (pren && (posti < 1 || posti > 2000)) throw new Errore("I posti devono essere tra 1 e 2000.");
   const max = Math.min(posti, Number.parseInt(d.pren_max, 10) || posti);
   let percorsi = Array.isArray(d.pren_percorsi) ? d.pren_percorsi : String(d.pren_percorsi || "").split(",");
-  percorsi = [...new Set(percorsi.map((x) => testo(x, 40)).filter(Boolean))].slice(0, 6);
-  if (percorsi.length === 1) throw new Errore("Indica almeno due percorsi (es. Adulti, Bambini) oppure lascia il campo vuoto.");
+  percorsi = percorsi.map((x) => (x && typeof x === "object"
+    ? { nome: testo(x.nome, 40), escape: testo(x.escape, 80), nota: testo(x.nota, 120) }
+    : { nome: testo(x, 40), escape: "", nota: "" }));
+  const senzaNome = percorsi.find((x) => !x.nome && (x.escape || x.nota));
+  if (senzaNome) throw new Errore(`Indica per chi è la escape «${senzaNome.escape || senzaNome.nota}» (es. Adulti o Bambini).`);
+  percorsi = percorsi.filter((x) => x.nome);
+  if (new Set(percorsi.map((x) => x.nome.toLowerCase())).size !== percorsi.length) throw new Errore("Due percorsi hanno lo stesso nome: usa nomi diversi (es. Adulti e Bambini).");
+  percorsi = percorsi.slice(0, 6);
+  if (percorsi.length === 1) throw new Errore("Indica almeno due percorsi (es. Adulti e Bambini) oppure lasciali vuoti."); 
   const chiusura = testo(d.pren_chiusura, 16) || null;
   if (chiusura && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(chiusura)) throw new Errore("La data di chiusura delle prenotazioni non è valida.");
   return {
@@ -348,7 +365,7 @@ async function disponibilita(env, id, admin) {
     max_per_prenotazione: Math.min(posti, ev.prenotazioni.max_per_prenotazione),
     fasce: fasceDi(ev).map((ora) => ({ ora, totale: posti, liberi: Math.max(0, posti - (occ[ora] || 0)) })),
     // con piu' percorsi (es. Adulti e Bambini) ogni percorso ha i suoi posti negli stessi orari
-    percorsi: ev.prenotazioni.percorsi.map((nome) => ({ nome,
+    percorsi: ev.prenotazioni.percorsi.map(({ nome, escape, nota }) => ({ nome, escape, nota,
       fasce: fasceDi(ev).map((ora) => ({ ora, totale: posti, liberi: Math.max(0, posti - (occ[chiaveOcc(nome, ora)] || 0)) })) })),
   });
 }
@@ -362,7 +379,7 @@ async function prenota(env, d, ctx, admin) {
 
   const fascia = testo(d.fascia, 10);
   if (!fasceDi(ev).includes(fascia)) throw new Errore("Scegli una fascia oraria valida.");
-  const percorsi = ev.prenotazioni.percorsi;
+  const percorsi = ev.prenotazioni.percorsi.map((x) => x.nome);
   const percorso = percorsi.length ? testo(d.percorso, 40) : "";
   if (percorsi.length && !percorsi.includes(percorso)) throw new Errore(`Scegli il percorso: ${percorsi.join(" o ")}.`);
   const nome = testo(d.nome, 60), cognome = testo(d.cognome, 60);
@@ -411,7 +428,8 @@ async function prenota(env, d, ctx, admin) {
       const p = { codice, chiave, nome, cognome, email, telefono, persone, fascia, socio, tessera, note, origine, percorso };
       const conferma = !!(email && emailAttiva(env));
       if (emailAttiva(env)) ctx.waitUntil(inviaEmailPrenotazione(env, ev, p).catch((e) => console.error("e-mail", e)));
-      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, percorso, email_conferma: conferma,
+      return json({ codice, evento: ev.id, titolo: ev.titolo, data: ev.data, fascia, persone, percorso,
+        percorso_etichetta: percorso ? etichettaPercorso(ev, percorso) : "", email_conferma: conferma,
         ...(staff ? { nome, telefono, link_annullo: linkAnnullo(env, p) } : {}) }, 201);
     } catch (e) {
       if (e instanceof Errore) throw e;
@@ -452,7 +470,7 @@ export function avvisoPerEmail(avviso) {
 }
 
 // "Escape room – Bambini" quando l'evento ha piu' percorsi
-const conPercorso = (ev, p) => (p && p.percorso ? { ...ev, titolo: `${ev.titolo} – ${p.percorso}` } : ev);
+const conPercorso = (ev, p) => (p && p.percorso ? { ...ev, titolo: `${ev.titolo} – ${etichettaPercorso(ev, p.percorso)}` } : ev);
 
 export function testoEmail(ev, p, link) {
   ev = { ...conPercorso(ev, p), avviso: avvisoPerEmail(ev.avviso) };
@@ -551,7 +569,7 @@ async function annullabile(env, r) {
 async function datiPerAnnullo(env, codice, k) {
   const r = await prenotazioneConChiave(env, codice, k);
   const { ev, puo } = await annullabile(env, r);
-  return json({ codice, nome: r.nome, persone: r.persone, fascia: r.fascia, percorso: r.percorso || "", stato: r.stato, annullabile: puo,
+  return json({ codice, nome: r.nome, persone: r.persone, fascia: r.fascia, percorso: r.percorso || "", percorso_etichetta: r.percorso && ev ? etichettaPercorso(ev, r.percorso) : r.percorso || "", stato: r.stato, annullabile: puo,
     titolo: ev ? ev.titolo : "", data: ev ? ev.data : "", orario: ev ? ev.orario : "", luogo: ev ? ev.luogo : "" });
 }
 

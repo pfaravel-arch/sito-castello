@@ -130,7 +130,7 @@ funzionare ma le e-mail non partono.
 
 ### Percorsi con posti separati (es. escape room Adulti e Bambini)
 
-Nella scheda dell'evento, campo «Percorsi con posti separati»: per esempio `Adulti, Bambini`. Gli orari sono
+Nella scheda dell'evento, spunta «Più percorsi» e una riga per percorso: per chi (es. Adulti), nome della escape e una nota facoltativa (es. età). Gli orari sono
 gli stessi, ma ogni percorso ha i suoi «Posti per ogni partenza». Nel modulo si sceglie prima il percorso e poi
 l'orario (con i colori per i posti liberi); conferme, annullamenti e Gestione prenotazioni indicano il percorso.
 

@@ -78,6 +78,25 @@
   function errore(e){avviso='';var p=box.querySelector('.errore-modulo')||document.createElement('p');p.className='errore-modulo';p.setAttribute('role','alert');p.textContent=e.message;box.prepend(p);window.scrollTo(0,box.offsetTop-20);}
 
   // ---------- editor ----------
+  // Percorsi con posti separati negli stessi orari: per chi (Adulti, Bambini...), nome della escape, nota (es. eta')
+  var ESEMPI=[['Adulti','Il segreto del conte','dai 14 anni'],['Bambini','Il laboratorio di Babbo Natale','dai 6 ai 12 anni'],['','',''],['','','']];
+  function righePercorsi(lista){
+    lista=lista.map(function(x){return typeof x==='string'?{nome:x,escape:'',nota:''}:x;});
+    var righe=[0,1,2,3].map(function(i){var x=lista[i]||{nome:'',escape:'',nota:''}, ex=ESEMPI[i];
+      return '<div class="percorso-riga"><span class="percorso-n">'+(i+1)+'</span>'+
+        '<label>Per chi<input name="pp_nome" maxlength="40" placeholder="'+esc(ex[0]||'')+'" value="'+esc(x.nome)+'"></label>'+
+        '<label>Nome della escape<input name="pp_escape" maxlength="80" placeholder="'+esc((ex[1]||'').trim())+'" value="'+esc(x.escape)+'"></label>'+
+        '<label><span>Nota <span class="facoltativo">(facoltativa)</span></span><input name="pp_nota" maxlength="120" placeholder="'+esc(ex[2]||'')+'" value="'+esc(x.nota)+'"></label></div>';}).join('');
+    return '<label class="spunta"><input type="checkbox" name="percorsi_attivi"'+(lista.length?' checked':'')+'><span><strong>Più percorsi</strong> con posti separati negli stessi orari (es. escape room per adulti e per bambini)</span></label>'+
+      '<div class="percorsi-righe"><p class="nota-modulo">Ogni riga è un percorso. Chi prenota vede il nome della escape in grande, con «per chi» e la nota sotto, e sceglie prima la escape e poi l\'orario. Le righe vuote non contano.</p>'+righe+'</div>';
+  }
+  function leggiPercorsi(form){
+    if(!form.percorsi_attivi.checked) return [];
+    var n=form.querySelectorAll('[name=pp_nome]'), e=form.querySelectorAll('[name=pp_escape]'), t=form.querySelectorAll('[name=pp_nota]'), out=[];
+    for(var i=0;i<n.length;i++){var x={nome:n[i].value.trim(),escape:e[i].value.trim(),nota:t[i].value.trim()};if(x.nome||x.escape||x.nota)out.push(x);}
+    return out;
+  }
+
   function editor(e,duplica){
     var nuovo=!e||duplica;
     e=e||{stato:'bozza',luogo:LUOGO,pren_posti:15,pren_max:10};
@@ -128,9 +147,9 @@
           '<div class="campi">'+
             '<label><span class="etichetta-posti">Posti per ogni partenza</span><input name="pren_posti" type="number" min="1" max="2000" value="'+esc(e.pren_posti||15)+'"></label>'+
             '<label>Massimo persone per prenotazione<input name="pren_max" type="number" min="1" max="2000" value="'+esc(e.pren_max||10)+'"></label>'+
-            '<label class="lungo">Percorsi con posti separati <span class="facoltativo">(es. «Adulti, Bambini»: stessi orari, ogni percorso ha i suoi posti per partenza; vuoto = percorso unico)</span><input name="pren_percorsi" maxlength="200" placeholder="Adulti, Bambini" value="'+esc((e.pren_percorsi||[]).join(', '))+'"></label>'+
             '<label class="lungo">Chiusura prenotazioni <span class="facoltativo">(vuoto = fino al giorno dell\'evento)</span><input name="pren_chiusura" type="datetime-local" value="'+esc(e.pren_chiusura||'')+'"></label>'+
           '</div>'+
+          righePercorsi(e.pren_percorsi||[])+
         '</div>'+
       '</fieldset>'+
 
@@ -153,6 +172,9 @@
       riduci(f0).then(function(b){file=b;togliLocandina=false;form.querySelector('.anteprima').innerHTML='<img src="'+URL.createObjectURL(b)+'" alt="Nuova locandina">';})
         .catch(function(){err.textContent='Non riesco a leggere questa immagine. Prova con un JPG o un PNG.';err.hidden=false;});
     };
+    var pa=form.percorsi_attivi, pr=form.querySelector('.percorsi-righe');
+    pa.onchange=function(){pr.hidden=!pa.checked;form.querySelector('.etichetta-posti').textContent=pa.checked?'Posti per ogni partenza, per ciascun percorso':'Posti per ogni partenza';};
+    pa.onchange();
     var tl=form.querySelector('.togli-locandina');
     if(tl) tl.onclick=function(){togliLocandina=true;file=null;form.locandina.value='';form.querySelector('.anteprima').innerHTML='<span>La locandina verrà tolta al salvataggio</span>';};
 
@@ -166,7 +188,9 @@
       }
       var dati={titolo:form.titolo.value,data:form.data.value,fine:form.fine.value,orario:form.orario.value,luogo:form.luogo.value,
         descrizione:form.descrizione.value,avviso:form.avviso.value,stato:form.stato.value,in_evidenza:form.in_evidenza.checked,
-        pren_attive:form.pren_attive.checked,pren_fasce:fasce,pren_posti:Number(form.pren_posti.value),pren_max:Number(form.pren_max.value),pren_chiusura:form.pren_chiusura.value,pren_percorsi:form.pren_percorsi.value};
+        pren_attive:form.pren_attive.checked,pren_fasce:fasce,pren_posti:Number(form.pren_posti.value),pren_max:Number(form.pren_max.value),pren_chiusura:form.pren_chiusura.value,pren_percorsi:leggiPercorsi(form)};
+      if(form.pren_attive.checked&&form.percorsi_attivi.checked&&dati.pren_percorsi.length<2){err.textContent='Compila almeno due percorsi (per esempio Adulti e Bambini, ciascuno con il nome della sua escape), oppure togli la spunta «Più percorsi».';err.hidden=false;return;}
+      if(dati.pren_percorsi.some(function(x){return !x.nome;})){err.textContent='In ogni percorso scrivi «Per chi» (es. Adulti o Bambini).';err.hidden=false;return;}
       if(!dati.titolo.trim()||!dati.data){err.textContent='Titolo e data sono obbligatori.';err.hidden=false;return;}
       var btn=form.querySelector('[type=submit]'); btn.disabled=true; btn.textContent='Salvataggio…';
       var salvataggio=nuovo?chiamata('POST','/admin/eventi',dati):chiamata('PUT','/admin/eventi/'+e.id,dati);

@@ -193,6 +193,12 @@ figcaption{font-size:.9rem;color:var(--carbone-tenue);margin-top:.5rem}
 .percorso:has(input:focus-visible){outline:2px solid var(--ocra);outline-offset:2px}
 .percorso.piena{background:#F7E0DD;border-color:#D08A82;cursor:not-allowed}
 .percorso.piena .posti{color:#8E2F26;font-weight:600}
+.percorsi-righe{margin:.8rem 0 0}
+.percorso-riga{display:grid;grid-template-columns:1.6rem minmax(7rem,1fr) minmax(10rem,2fr) minmax(8rem,1.4fr);gap:.6rem;align-items:end;margin-top:.6rem}
+.percorso-n{font-family:var(--serif-titoli);font-size:1.3rem;color:var(--carbone-tenue);padding-bottom:.6rem}
+@media (max-width:640px){.percorso-riga{grid-template-columns:1.6rem 1fr}.percorso-riga label{grid-column:2}}
+.percorso .chi{font-size:.95rem;font-weight:600;color:var(--guado-scuro)}
+.percorso .nota{font-size:.85rem;color:var(--carbone-tenue)}
 .legenda-turni{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin:.4rem 0 0;font-size:.82rem;color:var(--carbone-tenue)}
 .legenda-turni span::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.35em;vertical-align:-.05em;border:1px solid}
 .legenda-turni .libera::before{background:#E6F2E7;border-color:#7FB287}

@@ -9,11 +9,14 @@
   // numero per wa.me: solo cifre, con prefisso internazionale (39 se e' un cellulare italiano senza prefisso)
   function numeroWa(t){var n=String(t||'').replace(/[^\d+]/g,'');if(n.indexOf('00')===0)n=n.slice(2);else if(n.charAt(0)==='+')n=n.slice(1);else if(/^3\d{8,9}$/.test(n))n='39'+n;return n.replace(/\D/g,'');}
   function testoWa(r){
-    return 'Ciao '+r.nome+', la tua prenotazione per «'+corrente.titolo+(r.percorso?' – '+r.percorso:'')+'» del '+dataLunga(corrente.data)+(r.fascia!=='unica'?', partenza alle '+r.fascia:'')+', per '+r.persone+(r.persone===1?' persona':' persone')+', è confermata.\n'+
+    return 'Ciao '+r.nome+', la tua prenotazione per «'+corrente.titolo+(r.percorso?' – '+etichetta(r.percorso):'')+'» del '+dataLunga(corrente.data)+(r.fascia!=='unica'?', partenza alle '+r.fascia:'')+', per '+r.persone+(r.persone===1?' persona':' persone')+', è confermata.\n'+
       'Codice di prenotazione: '+r.codice+'\n'+
       (r.link_annullo?'Se non potrai più venire, annulla qui: '+r.link_annullo+'\n':'')+
       'Informativa privacy: https://www.castellodisilvanopietra.com/privacy.html\n\nCastello di Silvano Pietra APS';
   }
+  // percorsi dell'evento: [{nome, escape, nota}] (vecchi eventi: solo nomi)
+  function percorsiEv(){return (corrente.percorsi||[]).map(function(x){return typeof x==='string'?{nome:x,escape:'',nota:''}:x;});}
+  function etichetta(nome){var d=percorsiEv().filter(function(x){return x.nome===nome;})[0];return d&&d.escape?d.escape+' ('+nome+')':nome;}
   function waLink(r){return 'https://wa.me/'+numeroWa(r.telefono)+'?text='+encodeURIComponent(testoWa(r));}
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function leggi(k){try{return sessionStorage.getItem(k)||'';}catch(e){return '';}}
@@ -62,13 +65,13 @@
     h+=esito()+(nuovaAperta?moduloNuova():'');
     var fasce=corrente.fasce.slice(); righe.forEach(function(r){if(fasce.indexOf(r.fascia)<0)fasce.push(r.fascia);});
     // con piu' percorsi (es. Adulti e Bambini) un gruppo per ogni percorso e orario
-    var percorsi=(corrente.percorsi||[]).slice(); righe.forEach(function(r){if(r.percorso&&percorsi.indexOf(r.percorso)<0)percorsi.push(r.percorso);});
+    var percorsi=percorsiEv().map(function(x){return x.nome;}); righe.forEach(function(r){if(r.percorso&&percorsi.indexOf(r.percorso)<0)percorsi.push(r.percorso);});
     if(!percorsi.length) percorsi=[''];
     var gruppi=[]; percorsi.forEach(function(pc){fasce.forEach(function(f){gruppi.push([pc,f]);});});
     gruppi.forEach(function(g){
       var pc=g[0], f=g[1];
       var qui=righe.filter(function(r){return r.fascia===f&&(r.percorso||'')===pc;}); var occ=qui.filter(function(r){return r.stato!=='annullata';}).reduce(function(s,r){return s+r.persone;},0);
-      h+='<section class="gruppo"><h2>'+(pc?esc(pc)+(f==='unica'?'':' · '):'')+(f==='unica'?(pc?'':'Prenotazioni'):'Ore '+esc(f))+' <small>'+occ+' / '+corrente.posti_per_fascia+'</small></h2>';
+      h+='<section class="gruppo"><h2>'+(pc?esc(etichetta(pc))+(f==='unica'?'':' · '):'')+(f==='unica'?(pc?'':'Prenotazioni'):'Ore '+esc(f))+' <small>'+occ+' / '+corrente.posti_per_fascia+'</small></h2>';
       if(!qui.length){h+='<p class="vuoto">Nessuna prenotazione.</p></section>';return;}
       h+='<div class="tabella-scorre"><table class="tabella"><thead><tr><th>Codice</th><th>Nome</th><th>Persone</th><th>Contatti</th><th>Tessera</th><th>Note</th><th>Pagato</th><th></th></tr></thead><tbody>'+
         qui.map(function(r){
@@ -104,10 +107,10 @@
   // prenotazione ricevuta su WhatsApp, al telefono o di persona: la inserisce lo staff (basta il telefono)
   function moduloNuova(){
     var occ={}; righe.forEach(function(r){if(r.stato!=='annullata'){var k=(r.percorso||'')+'|'+r.fascia;occ[k]=(occ[k]||0)+r.persone;}});
-    var f=corrente.fasce, unica=f.length===1&&f[0]==='unica', perc=corrente.percorsi||[];
+    var f=corrente.fasce, unica=f.length===1&&f[0]==='unica', perc=percorsiEv().map(function(x){return x.nome;});
     return '<form class="modulo nuova-pren" novalidate><h2>Nuova prenotazione</h2>'+
       '<p class="nota-modulo">Per chi prenota su WhatsApp, al telefono o di persona. Se inserisci l\'e-mail parte la conferma automatica; dopo il salvataggio puoi mandarla anche su WhatsApp.</p><div class="campi">'+
-      (perc.length?'<label>Percorso<select name="percorso" required>'+perc.map(function(x){return '<option>'+esc(x)+'</option>';}).join('')+'</select></label>':'<input type="hidden" name="percorso" value="">')+
+      (perc.length?'<label>Percorso<select name="percorso" required>'+perc.map(function(x){return '<option value="'+esc(x)+'">'+esc(etichetta(x))+'</option>';}).join('')+'</select></label>':'<input type="hidden" name="percorso" value="">')+
       (unica?'<input type="hidden" name="fascia" value="unica">':'<label>Orario<select name="fascia" required>'+opzioniFasce(perc[0]||'',occ)+'</select></label>')+
       '<label>Ricevuta via<select name="origine"><option value="whatsapp">WhatsApp</option><option value="telefono">Telefono</option><option value="di persona">Di persona</option><option value="email">E-mail</option></select></label>'+
       '<label>Nome<input name="nome" required maxlength="60"></label><label>Cognome<input name="cognome" required maxlength="60"></label>'+
@@ -141,7 +144,7 @@
   function esito(){
     if(!esitoNuova) return '';
     var r=esitoNuova, wa=r.telefono&&numeroWa(r.telefono).length>=8;
-    return '<div class="esito-nuova"><p><strong>Prenotazione '+esc(r.codice)+' salvata</strong>: '+esc(r.nome)+', '+r.persone+(r.persone===1?' persona':' persone')+(r.percorso?', '+esc(r.percorso):'')+(r.fascia!=='unica'?', ore '+esc(r.fascia):'')+'.'+
+    return '<div class="esito-nuova"><p><strong>Prenotazione '+esc(r.codice)+' salvata</strong>: '+esc(r.nome)+', '+r.persone+(r.persone===1?' persona':' persone')+(r.percorso?', '+esc(etichetta(r.percorso)):'')+(r.fascia!=='unica'?', ore '+esc(r.fascia):'')+'.'+
       (r.email_conferma?' Conferma inviata per e-mail.':'')+'</p><div class="gestione-azioni">'+
       (wa?'<a class="bottone bottone-pieno" href="'+esc(waLink(r))+'" target="_blank" rel="noopener">Invia la conferma su WhatsApp</a>':'')+
       '<button type="button" class="bottone chiudi-esito">Chiudi</button></div></div>';
@@ -159,7 +162,7 @@
   function scarica(){
     var col=['Codice','Canale','Percorso','Fascia','Cognome','Nome','Persone','Telefono','E-mail','Tessera','Note','Stato','Pagato','Creata'];
     var q=function(v){v=String(v==null?'':v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-    var rows=righe.map(function(r){return [r.codice,CANALI[r.origine]||'Sito',r.percorso||'',r.fascia,r.cognome,r.nome,r.persone,r.telefono,r.email,r.socio==='richiesta'?'Chiede adesione':r.socio==='si'?(r.tessera||'Socio'):'',r.note,r.stato+(r.annullata_da==='partecipante'?' dal partecipante':''),r.pagato?'Sì':'No',r.creata].map(q).join(';');});
+    var rows=righe.map(function(r){return [r.codice,CANALI[r.origine]||'Sito',r.percorso?etichetta(r.percorso):'',r.fascia,r.cognome,r.nome,r.persone,r.telefono,r.email,r.socio==='richiesta'?'Chiede adesione':r.socio==='si'?(r.tessera||'Socio'):'',r.note,r.stato+(r.annullata_da==='partecipante'?' dal partecipante':''),r.pagato?'Sì':'No',r.creata].map(q).join(';');});
     var blob=new Blob(['﻿'+col.join(';')+'\n'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='prenotazioni-'+corrente.id+'.csv';document.body.appendChild(a);a.click();a.remove();
   }

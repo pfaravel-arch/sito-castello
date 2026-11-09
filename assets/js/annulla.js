@@ -20,7 +20,7 @@
   }).then(function(p){
     var riepilogo='<ul class="elenco-semplice">'+
       '<li><span>Evento</span><span>'+esc(p.titolo)+'</span></li>'+
-      (p.percorso?'<li><span>Percorso</span><span>'+esc(p.percorso)+'</span></li>':'')+
+      (p.percorso?'<li><span>Percorso</span><span>'+esc(p.percorso_etichetta||p.percorso)+'</span></li>':'')+
       '<li><span>Quando</span><span>'+esc(data(p.data))+(p.fascia!=='unica'?', partenza alle '+esc(p.fascia):'')+'</span></li>'+
       '<li><span>Persone</span><span>'+p.persone+'</span></li>'+
       '<li><span>Codice</span><span>'+esc(p.codice)+'</span></li></ul>';
