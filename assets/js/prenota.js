@@ -6,6 +6,9 @@
   var API='';
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function dataLunga(d){var x=new Date(d+'T12:00:00');return x.getDate()+' '+MESI[x.getMonth()]+' '+x.getFullYear();}
+  // colore della fascia: verde finche' e' occupata meno della meta', giallo fino all'esaurimento, rosso se completa
+  function livello(f){var tot=f.totale||f.liberi||1;return f.liberi<1?'piena':f.liberi>=tot/2?'libera':'quasi';}
+  function postiTesto(f){return f.liberi<1?'completo':f.liberi+(f.liberi===1?' posto libero':' posti liberi');}
   function contatti(msg){
     box.innerHTML='<p class="avviso-modulo">'+esc(msg)+'</p><p>Puoi prenotare scrivendo a <a href="mailto:castellodisilvanopietra@gmail.com">castellodisilvanopietra@gmail.com</a> o su WhatsApp al <a href="https://wa.me/393513479312">351 347 9312</a>.</p>';
   }
@@ -37,18 +40,15 @@
       (unica?'<input type="hidden" name="fascia" value="unica">':
       '<fieldset class="turni"><legend>Scegli l\'orario di partenza</legend>'+ev.fasce.map(function(f){
         var off=f.liberi<1;
-        return '<label class="turno'+(off?' piena':'')+'"><input type="radio" name="fascia" value="'+esc(f.ora)+'"'+(off?' disabled':'')+' required><span class="ora">'+esc(f.ora)+'</span><span class="posti">'+(off?'completo':f.liberi+(f.liberi===1?' posto':' posti'))+'</span></label>';
-      }).join('')+'</fieldset>')+
+        return '<label class="turno '+livello(f)+'"><input type="radio" name="fascia" value="'+esc(f.ora)+'"'+(off?' disabled':'')+' required><span class="ora">'+esc(f.ora)+'</span><span class="posti">'+postiTesto(f)+'</span></label>';
+      }).join('')+'<p class="legenda-turni"><span class="libera">posti liberi</span><span class="quasi">ultimi posti</span><span class="piena">completo</span></p></fieldset>')+
       '<div class="campi">'+
         '<label>Nome<input name="nome" autocomplete="given-name" required maxlength="60"></label>'+
         '<label>Cognome<input name="cognome" autocomplete="family-name" required maxlength="60"></label>'+
         '<label>E-mail<input name="email" type="email" autocomplete="email" maxlength="120"></label>'+
         '<label>Telefono<input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>'+
         '<label>Numero di persone<input name="persone" type="number" min="1" max="'+ev.max_per_prenotazione+'" value="1" required></label>'+
-        '<label>Sei socio dell\'associazione?<select name="socio"><option value="si">Sì, sono già socio</option><option value="richiesta">No, chiedo di aderire</option></select></label>'+
-        '<label class="campo-tessera">Numero di tessera <span class="facoltativo">(facoltativo, es. 2026-001)</span><input name="tessera" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="2026-001"></label>'+
       '</div>'+
-      '<label class="lungo">Note (facoltative)<textarea name="note" rows="2" maxlength="300"></textarea></label>'+
       '<label class="nascosto" aria-hidden="true">Sito web<input name="sito_web" tabindex="-1" autocomplete="off"></label>'+
       '<label class="consenso"><input type="checkbox" name="consenso" required><span>Acconsento al trattamento dei miei dati per gestire la prenotazione, come descritto nell\'<a href="/privacy.html" target="_blank">informativa privacy</a>.</span></label>'+
       '<p class="errore-modulo" role="alert" hidden></p>'+
@@ -57,13 +57,11 @@
     '</form>';
     box.innerHTML=h;
     var form=box.querySelector('form'), err=box.querySelector('.errore-modulo'), btn=form.querySelector('button');
-    var campoTessera=form.querySelector('.campo-tessera');
-    form.socio.onchange=function(){campoTessera.hidden=this.value!=='si';if(campoTessera.hidden)form.tessera.value='';};
     form.addEventListener('submit',function(e){
       e.preventDefault(); err.hidden=true;
       var f=new FormData(form);
       var dati={evento:id,fascia:f.get('fascia')||'',nome:f.get('nome'),cognome:f.get('cognome'),email:f.get('email'),telefono:f.get('telefono'),
-        persone:Number(f.get('persone')),socio:f.get('socio'),tessera:f.get('tessera'),note:f.get('note'),sito_web:f.get('sito_web'),consenso:form.consenso.checked};
+        persone:Number(f.get('persone')),sito_web:f.get('sito_web'),consenso:form.consenso.checked};
       var problema=!dati.fascia?'Scegli un orario.':!dati.nome||!dati.cognome?'Inserisci nome e cognome.':
         !dati.email&&!dati.telefono?'Lascia almeno un\'e-mail o un numero di telefono.':!dati.consenso?'Serve il consenso al trattamento dei dati.':'';
       if(problema){err.textContent=problema;err.hidden=false;return;}
@@ -80,7 +78,7 @@
         err.textContent=e2.message; err.hidden=false; btn.disabled=false; btn.textContent='Conferma la prenotazione';
         chiamata('GET','/eventi/'+encodeURIComponent(id)).then(function(ev2){ // aggiorna i posti liberi
           ev2.fasce.forEach(function(x){var i=form.querySelector('input[name=fascia][value="'+x.ora+'"]');if(!i)return;var l=i.closest('.turno');
-            l.querySelector('.posti').textContent=x.liberi<1?'completo':x.liberi+(x.liberi===1?' posto':' posti');i.disabled=x.liberi<1;l.classList.toggle('piena',x.liberi<1);if(i.disabled)i.checked=false;});
+            l.querySelector('.posti').textContent=postiTesto(x);i.disabled=x.liberi<1;l.className='turno '+livello(x);if(i.disabled)i.checked=false;});
         }).catch(function(){});
       });
     });

@@ -130,9 +130,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // numero di tessera ed e-mail di conferma
   email.length = 0;
-  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 2, tessera: "n. 2026-7" });
+  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 2, socio: "si", tessera: "n. 2026-7" });
   assert.equal(r.status, 201, JSON.stringify(r.dati)); assert.equal(r.dati.email_conferma, true);
-  assert.equal((await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", tessera: "abc" })).status, 400);
+  assert.equal((await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", socio: "si", tessera: "abc" })).status, 400);
   await Promise.all(attese);
   assert.equal(email.length, 2, "conferma + copia all'associazione");
   const conf = email.find((e) => e.to[0].email === "mario@example.com");
@@ -166,16 +166,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   await Promise.all(attese); assert.equal(email.length, 1, "solo copia all'associazione se manca l'e-mail");
   assert.match(dataEstesa("2026-12-08"), /^martedì 8 dicembre 2026$/);
 
+  // modulo senza socio, tessera e note: niente riga "Tessera" nelle e-mail
+  email.length = 0;
+  r = await chiama("POST", "/prenotazioni", { ...base, fascia: "16:00", persone: 1, email: "anna@example.com", note: undefined });
+  assert.equal(r.status, 201); await Promise.all(attese);
+  assert.equal(email.length, 2);
+  assert.ok(email.every((e) => !/Tessera/.test(e.textContent)), "nessuna riga Tessera senza la domanda sul socio");
+
   // accesso con il codice dell'area riservata
   assert.equal((await chiama("GET", "/admin/eventi", null, { "X-Password": TOKEN })).status, 200);
   assert.equal((await chiama("GET", "/admin/eventi", null, { "X-Password": TOKEN + "x" })).status, 401);
 
   // area riservata prenotazioni
   r = await chiama("GET", "/admin/eventi?prenotabili=1", null, A);
-  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 18); assert.equal(r.dati[0].aperte, true);
+  assert.equal(r.dati.length, 1); assert.equal(r.dati[0].persone, 19); assert.equal(r.dati[0].aperte, true);
   assert.equal((await chiama("GET", "/admin/eventi", null, A)).dati.length, 2);
   const elenco = (await chiama("GET", "/admin/prenotazioni?evento=" + id, null, A)).dati;
-  assert.equal(elenco.length, 6); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
+  assert.equal(elenco.length, 7); assert.equal(elenco.find((x) => x.email === "anna@example.com").socio, ""); assert.equal(elenco.find((x) => x.tessera === "2026-007").persone, 2);
   assert.equal(elenco.find((x) => x.socio === "richiesta").tessera, null, "chi chiede di aderire non ha tessera");
   assert.equal((await chiama("PATCH", "/admin/prenotazioni/" + codice, { stato: "annullata" }, A)).status, 200);
   assert.equal((await chiama("GET", "/eventi/" + id)).dati.fasce[0].liberi, 4);

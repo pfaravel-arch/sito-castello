@@ -354,7 +354,8 @@ async function prenota(env, d, ctx, admin) {
   const maxPer = Math.min(posti, ev.prenotazioni.max_per_prenotazione);
   const persone = Number.parseInt(d.persone, 10);
   if (!Number.isInteger(persone) || persone < 1 || persone > maxPer) throw new Errore(`Il numero di persone deve essere tra 1 e ${maxPer}.`);
-  const socio = d.socio === "richiesta" ? "richiesta" : "si";
+  // il modulo non chiede piu' se e' socio ne' la tessera: si registra vuoto ("")
+  const socio = d.socio === "richiesta" ? "richiesta" : d.socio === "si" ? "si" : "";
   let tessera = null;
   if (socio === "si" && testo(d.tessera, 20)) {
     const t = testo(d.tessera, 20).toUpperCase().replace(/^N\.?\s*/, "").replace(/\s+/g, "");
@@ -423,8 +424,8 @@ export function testoEmail(ev, p, link) {
   const righe = [
     ["Evento", ev.titolo], ["Quando", quando], ["Dove", ev.luogo || "Castello di Silvano Pietra"],
     ["Persone", String(p.persone)], ["Nome", `${p.nome} ${p.cognome}`],
-    ["Tessera", p.socio === "richiesta" ? "chiede di aderire all'associazione" : p.tessera || "socio"],
   ];
+  if (p.socio) righe.push(["Tessera", p.socio === "richiesta" ? "chiede di aderire all'associazione" : p.tessera || "socio"]);
   const oggetto = `Prenotazione confermata: ${ev.titolo} (codice ${p.codice})`;
   const testo = `Ciao ${p.nome},\n\nla tua prenotazione è confermata.\n\nCodice di prenotazione: ${p.codice}\n\n` +
     righe.map(([k, v]) => `${k}: ${v}`).join("\n") +
@@ -491,7 +492,7 @@ async function inviaEmailPrenotazione(env, ev, p) {
     const contatti = [p.email, p.telefono].filter(Boolean).join(" · ");
     invii.push(invia(env, env.EMAIL_COPIA, "", `Nuova prenotazione: ${ev.titolo}, ${p.fascia !== "unica" ? "ore " + p.fascia + ", " : ""}${p.persone} pers. (${p.codice})`,
       `${p.cognome} ${p.nome}, ${p.persone} persone\n${contatti}\n` +
-      `Tessera: ${p.socio === "richiesta" ? "chiede di aderire" : p.tessera || "socio, numero non indicato"}\n` + (p.note ? `Note: ${p.note}\n` : "") +
+      (p.socio ? `Tessera: ${p.socio === "richiesta" ? "chiede di aderire" : p.tessera || "socio, numero non indicato"}\n` : "") + (p.note ? `Note: ${p.note}\n` : "") +
       `\nCodice ${p.codice}. Elenco completo: https://www.castellodisilvanopietra.com/gestione-prenotazioni.html`));
   }
   await Promise.all(invii);
