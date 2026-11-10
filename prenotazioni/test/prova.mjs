@@ -188,6 +188,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     pren_percorsi: [{ nome: "Adulti", escape: "Il segreto del conte", nota: "" }, { nome: "Bambini", escape: "Il laboratorio di Babbo Natale", nota: "dai 6 ai 12 anni" }, { nome: "", escape: "", nota: "" }] }, A);
   assert.equal(r.status, 201, JSON.stringify(r.dati));
   const idEsc = r.dati.id;
+  r = await chiama("GET", "/admin/eventi/" + idEsc, null, A);
+  await chiama("PUT", "/admin/eventi/" + idEsc, { ...r.dati, email_testo: "**Contributo e tessera**\nSe sei già socio, il contributo è di 2,50 €.\n\nSe non sei <socio>..." }, A);
+  assert.equal((await chiama("GET", "/admin/eventi/" + idEsc, null, A)).dati.email_testo.split("\n").length, 4);
+  assert.ok(!JSON.stringify((await chiama("GET", "/calendario")).dati).includes("2,50"), "il testo per l'e-mail non e' pubblico");
   assert.equal((await chiama("POST", "/admin/eventi", { titolo: "X", data: giorno(20), pren_attive: true, pren_percorsi: "Solo" }, A)).status, 400);
   r = await chiama("GET", "/eventi/" + idEsc);
   assert.deepEqual(r.dati.percorsi.map((x) => x.nome), ["Adulti", "Bambini"]);
@@ -201,6 +205,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 6, percorso: "Adulti" })).status, 201);
   await Promise.all(attese);
   assert.ok(email.some((e) => /Escape room – Il segreto del conte \(Adulti\)/.test(e.subject)), "escape e percorso nell'oggetto");
+  const confEsc = email.find((e) => e.to?.[0]?.email === "ugo@example.com" || /ugo@example/.test(JSON.stringify(e.to)));
+  assert.ok(confEsc, "e-mail al partecipante");
+  assert.match(confEsc.htmlContent, /<strong>Contributo e tessera<\/strong>/); assert.match(confEsc.htmlContent, /&lt;socio&gt;/);
+  assert.match(confEsc.textContent, /Contributo e tessera\nSe sei già socio/); assert.ok(!/\*\*/.test(confEsc.textContent));
   assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 1, percorso: "Adulti" })).status, 409, "Adulti 16:00 pieno");
   assert.equal((await chiama("POST", "/prenotazioni", { ...pe, persone: 6, percorso: "Bambini" })).status, 201, "Bambini ha i suoi posti");
   r = await chiama("GET", "/eventi/" + idEsc);

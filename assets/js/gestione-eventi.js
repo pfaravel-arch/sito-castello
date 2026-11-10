@@ -150,6 +150,8 @@
             '<label class="lungo">Chiusura prenotazioni <span class="facoltativo">(vuoto = fino al giorno dell\'evento)</span><input name="pren_chiusura" type="datetime-local" value="'+esc(e.pren_chiusura||'')+'"></label>'+
           '</div>'+
           righePercorsi(e.pren_percorsi||[])+
+          '<label class="lungo testo-email"><span>Testo aggiuntivo nell\'e-mail di conferma <span class="facoltativo">(facoltativo: compare solo nell\'e-mail a chi ha prenotato, non sul sito. Ogni riga è un paragrafo; per il grassetto scrivi **così**)</span></span>'+
+            '<textarea name="email_testo" rows="7" maxlength="3000">'+esc(e.email_testo||'')+'</textarea></label>'+
         '</div>'+
       '</fieldset>'+
 
@@ -188,7 +190,7 @@
       }
       var dati={titolo:form.titolo.value,data:form.data.value,fine:form.fine.value,orario:form.orario.value,luogo:form.luogo.value,
         descrizione:form.descrizione.value,avviso:form.avviso.value,stato:form.stato.value,in_evidenza:form.in_evidenza.checked,
-        pren_attive:form.pren_attive.checked,pren_fasce:fasce,pren_posti:Number(form.pren_posti.value),pren_max:Number(form.pren_max.value),pren_chiusura:form.pren_chiusura.value,pren_percorsi:leggiPercorsi(form)};
+        pren_attive:form.pren_attive.checked,pren_fasce:fasce,pren_posti:Number(form.pren_posti.value),pren_max:Number(form.pren_max.value),pren_chiusura:form.pren_chiusura.value,pren_percorsi:leggiPercorsi(form),email_testo:form.email_testo.value};
       if(form.pren_attive.checked&&form.percorsi_attivi.checked&&dati.pren_percorsi.length<2){err.textContent='Compila almeno due percorsi (per esempio Adulti e Bambini, ciascuno con il nome della sua escape), oppure togli la spunta «Più percorsi».';err.hidden=false;return;}
       if(dati.pren_percorsi.some(function(x){return !x.nome;})){err.textContent='In ogni percorso scrivi «Per chi» (es. Adulti o Bambini).';err.hidden=false;return;}
       if(!dati.titolo.trim()||!dati.data){err.textContent='Titolo e data sono obbligatori.';err.hidden=false;return;}

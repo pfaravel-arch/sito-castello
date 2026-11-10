@@ -134,6 +134,12 @@ Nella scheda dell'evento, spunta «Più percorsi» e una riga per percorso: per 
 gli stessi, ma ogni percorso ha i suoi «Posti per ogni partenza». Nel modulo si sceglie prima il percorso e poi
 l'orario (con i colori per i posti liberi); conferme, annullamenti e Gestione prenotazioni indicano il percorso.
 
+### Testo aggiuntivo nell'e-mail di conferma
+
+Campo «Testo aggiuntivo nell'e-mail di conferma» nella scheda dell'evento (colonna `email_testo`): compare solo
+nell'e-mail a chi ha prenotato, in un riquadro sotto i dettagli; non è nel JSON pubblico del calendario.
+Ogni riga è un paragrafo, `**testo**` diventa grassetto.
+
 ### Prenotazioni da WhatsApp, telefono o di persona
 
 Dal sito l'e-mail è obbligatoria. Chi prenota in altro modo si inserisce da Gestione prenotazioni con

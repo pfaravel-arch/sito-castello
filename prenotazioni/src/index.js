@@ -86,7 +86,7 @@ async function instrada(request, env, ctx) {
 
 // ---------- eventi: lettura ----------
 
-const COLONNE = "id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, pren_percorsi, locandina_tipo, locandina_ver";
+const COLONNE = "id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, pren_percorsi, email_testo, locandina_tipo, locandina_ver";
 
 async function rigaEvento(env, id) {
   await importaSeVuoto(env);
@@ -119,6 +119,10 @@ function fasceDaRiga(r) {
 
 // Forma comune usata da prenotazioni e pagine: { ..., prenotazioni: {id, fasce, posti, ...} | null }
 function evento(r, origine) {
+  // il testo per l'e-mail di conferma resta fuori dal JSON pubblico (proprieta' non enumerabile)
+  return Object.defineProperty(eventoPubblico(r, origine), "email_testo", { value: r.email_testo || "", enumerable: false });
+}
+function eventoPubblico(r, origine) {
   return {
     id: r.id, titolo: r.titolo, data: r.data, fine: r.fine || null, orario: r.orario || "", luogo: r.luogo || "",
     descrizione: r.descrizione || "", avviso: r.avviso || "", stato: r.stato, in_evidenza: !!r.in_evidenza,
@@ -132,7 +136,7 @@ function evento(r, origine) {
 
 function perAdmin(r, origine) {
   return { ...evento(r, origine), pren_attive: !!r.pren_attive, pren_fasce: fasceDaRiga(r),
-    pren_posti: Number(r.pren_posti), pren_max: Number(r.pren_max), pren_chiusura: r.pren_chiusura || "", pren_percorsi: percorsiDaRiga(r) };
+    pren_posti: Number(r.pren_posti), pren_max: Number(r.pren_max), pren_chiusura: r.pren_chiusura || "", pren_percorsi: percorsiDaRiga(r), email_testo: r.email_testo || "" };
 }
 
 async function calendario(env, url) {
@@ -288,6 +292,7 @@ function validaEvento(d) {
     in_evidenza: d.in_evidenza ? 1 : 0, pren_attive: pren ? 1 : 0, pren_fasce: fasce ? JSON.stringify(fasce) : null,
     pren_posti: posti, pren_max: Math.max(1, max), pren_chiusura: chiusura,
     pren_percorsi: pren && percorsi.length ? JSON.stringify(percorsi) : null,
+    email_testo: testoLungo(d.email_testo, 3000) || null,
   };
 }
 
@@ -298,10 +303,10 @@ async function adminCrea(env, d) {
   for (let i = 2; await env.DB.prepare("SELECT 1 FROM eventi WHERE id = ?").bind(id).first(); i++) id = `${slug(v.titolo, v.data)}-${i}`;
   if (v.in_evidenza) await env.DB.prepare("UPDATE eventi SET in_evidenza = 0").run();
   await env.DB.prepare(
-    `INSERT INTO eventi (id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, pren_percorsi)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO eventi (id, titolo, data, fine, orario, luogo, descrizione, avviso, stato, in_evidenza, pren_attive, pren_fasce, pren_posti, pren_max, pren_chiusura, pren_percorsi, email_testo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(id, v.titolo, v.data, v.fine, v.orario, v.luogo, v.descrizione, v.avviso, v.stato, v.in_evidenza,
-    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, v.pren_percorsi).run();
+    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, v.pren_percorsi, v.email_testo).run();
   return json({ id }, 201);
 }
 
@@ -311,9 +316,9 @@ async function adminModifica(env, id, d, origine) {
   if (v.in_evidenza) await env.DB.prepare("UPDATE eventi SET in_evidenza = 0 WHERE id != ?").bind(id).run();
   await env.DB.prepare(
     `UPDATE eventi SET titolo = ?, data = ?, fine = ?, orario = ?, luogo = ?, descrizione = ?, avviso = ?, stato = ?, in_evidenza = ?,
-       pren_attive = ?, pren_fasce = ?, pren_posti = ?, pren_max = ?, pren_chiusura = ?, pren_percorsi = ?, aggiornato = datetime('now') WHERE id = ?`
+       pren_attive = ?, pren_fasce = ?, pren_posti = ?, pren_max = ?, pren_chiusura = ?, pren_percorsi = ?, email_testo = ?, aggiornato = datetime('now') WHERE id = ?`
   ).bind(v.titolo, v.data, v.fine, v.orario, v.luogo, v.descrizione, v.avviso, v.stato, v.in_evidenza,
-    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, v.pren_percorsi, id).run();
+    v.pren_attive, v.pren_fasce, v.pren_posti, v.pren_max, v.pren_chiusura, v.pren_percorsi, v.email_testo, id).run();
   return json(perAdmin(await rigaEvento(env, id), origine));
 }
 
@@ -473,6 +478,7 @@ export function avvisoPerEmail(avviso) {
 const conPercorso = (ev, p) => (p && p.percorso ? { ...ev, titolo: `${ev.titolo} – ${etichettaPercorso(ev, p.percorso)}` } : ev);
 
 export function testoEmail(ev, p, link) {
+  const extra = String(ev.email_testo || "").trim(); // va letto prima della copia: non e' enumerabile
   ev = { ...conPercorso(ev, p), avviso: avvisoPerEmail(ev.avviso) };
   const quando = dataEstesa(ev.data) + (p.fascia !== "unica" ? `, partenza alle ${p.fascia}` : ev.orario ? `, ${ev.orario}` : "");
   const righe = [
@@ -481,9 +487,14 @@ export function testoEmail(ev, p, link) {
   ];
   if (p.socio) righe.push(["Tessera", p.socio === "richiesta" ? "chiede di aderire all'associazione" : p.tessera || "socio"]);
   const oggetto = `Prenotazione confermata: ${ev.titolo} (codice ${p.codice})`;
+  // testo aggiuntivo dell'evento (Gestione eventi): una riga = un paragrafo, **grassetto**
+  const extraHtml = extra ? `<div style="margin:20px 0 0;padding:14px 16px;background:#EDF2F8;border-left:4px solid #2A4366">` +
+    extra.split(/\n+/).map((r) => r.trim()).filter(Boolean).map((r) =>
+      `<p style="font-size:15px;line-height:1.6;margin:0 0 8px">${h(r).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</p>`).join("") + `</div>` : "";
   const testo = `Ciao ${p.nome},\n\nla tua prenotazione è confermata.\n\nCodice di prenotazione: ${p.codice}\n\n` +
     righe.map(([k, v]) => `${k}: ${v}`).join("\n") +
     (ev.avviso ? `\n\n${ev.avviso}` : "") +
+    (extra ? `\n\n${extra.replace(/\*\*/g, "")}` : "") +
     `\n\nMostra questo codice all'arrivo. Ti chiediamo di arrivare con 15-30 minuti di anticipo.\n` +
     (link ? `Se non puoi più venire, annulla la prenotazione da qui (i posti tornano disponibili per altri):\n${link}\n` : "") +
     `Per domande o modifiche rispondi a questa e-mail.\n\nA presto al Castello!\nCastello di Silvano Pietra APS\nPiazza Vittorio Veneto 4, 27050 Silvano Pietra (PV)\nwww.castellodisilvanopietra.com`;
@@ -499,6 +510,7 @@ export function testoEmail(ev, p, link) {
 ${righe.map(([k, v]) => `<tr><td style="padding:8px 12px 8px 0;color:#5B6064;border-bottom:1px solid #CBC7C1;width:90px;vertical-align:top">${h(k)}</td><td style="padding:8px 0;border-bottom:1px solid #CBC7C1">${h(v)}</td></tr>`).join("")}
 </table>
 ${ev.avviso ? `<p style="font-style:italic;font-size:15px;line-height:1.6;margin:18px 0 0">${h(ev.avviso)}</p>` : ""}
+${extraHtml}
 <p style="font-size:15px;line-height:1.6;margin:18px 0 0">Mostra questo codice all'arrivo. Ti chiediamo di arrivare con 15-30 minuti di anticipo.</p>
 ${link ? `<p style="font-size:15px;line-height:1.6;margin:18px 0 8px">Se non puoi più venire, annulla la prenotazione: i posti tornano disponibili per altri.</p>
 <p style="margin:0"><a href="${h(link)}" style="display:inline-block;padding:10px 18px;border:1px solid #2F3336;color:#2F3336;text-decoration:none;font-size:15px">Annulla la prenotazione</a></p>` : ""}
